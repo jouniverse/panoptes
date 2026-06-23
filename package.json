@@ -1,0 +1,52 @@
+{
+  "name": "panoptes",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Panoptes - global military-intelligence & geopolitics geospatial web app (free public data).",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "geo:build": "node scripts/build-geo.mjs",
+    "geo:tiles": "node scripts/build-tiles.mjs"
+  },
+  "dependencies": {
+    "@deck.gl/aggregation-layers": "^9.1.0",
+    "@deck.gl/core": "^9.1.0",
+    "@deck.gl/geo-layers": "^9.1.0",
+    "@deck.gl/layers": "^9.1.0",
+    "@deck.gl/mapbox": "^9.1.0",
+    "@deck.gl/react": "^9.1.0",
+    "@protomaps/basemaps": "^5.0.0",
+    "@tanstack/react-query": "^5.62.0",
+    "@turf/turf": "^7.2.0",
+    "d3": "^7.9.0",
+    "lightweight-charts": "^5.0.0",
+    "maplibre-gl": "^5.0.0",
+    "next": "^15.5.0",
+    "pmtiles": "^4.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-map-gl": "^8.0.0",
+    "satellite.js": "^5.0.0",
+    "supercluster": "^8.0.1",
+    "zod": "^3.24.0",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/d3": "^7.4.3",
+    "@types/geojson": "^7946.0.16",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/supercluster": "^7.1.3",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "^15.5.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.0"
+  }
+}

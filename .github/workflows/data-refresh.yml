@@ -1,0 +1,52 @@
+name: Data Refresh
+
+# Scheduled rebuild of derived geo assets + Tier B PMTiles. Requires the raw
+# static-data dump (multi-GB) to be available; provide it via the DATA_DUMP_URL
+# secret (a tarball URL). Without it, the job no-ops. Tiles are pushed to object
+# storage (configure the upload step for your provider, e.g. R2/S3/Blob).
+
+on:
+  schedule:
+    - cron: "17 4 * * *" # daily 04:17 UTC
+  workflow_dispatch:
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Fetch raw data dump
+        if: ${{ secrets.DATA_DUMP_URL != '' }}
+        run: |
+          curl -L "${{ secrets.DATA_DUMP_URL }}" -o data.tar.zst
+          mkdir -p static-data
+          tar --use-compress-program=unzstd -xf data.tar.zst -C .
+
+      - name: Install GDAL + tippecanoe
+        if: ${{ secrets.DATA_DUMP_URL != '' }}
+        run: sudo apt-get update && sudo apt-get install -y gdal-bin tippecanoe
+
+      - name: Rebuild Tier A geo + indicators
+        if: ${{ secrets.DATA_DUMP_URL != '' }}
+        run: npm run geo:build
+
+      - name: Rebuild Tier B PMTiles
+        if: ${{ secrets.DATA_DUMP_URL != '' }}
+        run: npm run geo:tiles
+
+      - name: Commit refreshed Tier A assets
+        if: ${{ secrets.DATA_DUMP_URL != '' }}
+        run: |
+          git config user.name "panoptes-bot"
+          git config user.email "bot@panoptes.local"
+          git add public/geo public/data src/data
+          git commit -m "chore: refresh derived geo assets" || echo "no changes"
+          git push || echo "nothing to push"
+
+      # TODO: upload public/tiles/*.pmtiles to object storage (R2 / S3 / Blob).

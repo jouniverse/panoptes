@@ -1,0 +1,465 @@
+import type { LayerCategory, LayerDefinition } from "@/core/types";
+import { PALETTE } from "./theme";
+
+/**
+ * The single source of truth for every data layer in Panoptes.
+ *
+ * Rendering, the left-rail toggles, clustering, filtering and source-health all
+ * read from this registry. Adding a layer = adding one entry here (+ a static
+ * file under public/geo or an /api route that returns normalized GeoJSON).
+ *
+ * `source.ref`:
+ *   - static  -> file under /public/geo/<ref>
+ *   - api     -> route under /api/<ref>
+ *   - pmtiles -> tile URL (served from /tiles or object storage)
+ */
+export const LAYERS: LayerDefinition[] = [
+  // ---------------------------------------------------------------- reference
+  {
+    id: "country-borders",
+    name: "Country Borders",
+    category: "reference",
+    mode: "curated",
+    kind: "polygon",
+    marker: "ring",
+    color: PALETTE.outline,
+    renderer: "both",
+    defaultEnabled: true,
+    description: "Admin-0 sovereign boundaries (Natural Earth).",
+    source: {
+      kind: "static",
+      ref: "country-borders.geojson",
+      attribution: "Natural Earth",
+      license: "Public Domain",
+      cadence: "static",
+    },
+  },
+  {
+    id: "populated-places",
+    name: "Populated Places",
+    category: "reference",
+    mode: "osint",
+    kind: "point",
+    marker: "square",
+    color: PALETTE.outline,
+    renderer: "both",
+    defaultEnabled: false,
+    minZoom: 3,
+    description: "Major cities and towns (Natural Earth) — population context.",
+    source: {
+      kind: "static",
+      ref: "populated-places.geojson",
+      attribution: "Natural Earth",
+      license: "Public Domain",
+      cadence: "static",
+    },
+  },
+
+  // ----------------------------------------------------------------- military
+  {
+    id: "military-bases",
+    name: "Military Bases",
+    category: "military",
+    mode: "curated",
+    kind: "point",
+    marker: "triangle",
+    color: PALETTE.gold,
+    renderer: "both",
+    defaultEnabled: true,
+    description: "Global military installations (community + OSM derived).",
+    source: {
+      kind: "static",
+      ref: "military-bases.geojson",
+      attribution: "OSM / community KML",
+      license: "ODbL / community",
+      cadence: "static",
+    },
+  },
+  {
+    id: "launch-sites",
+    name: "Launch & Spaceports",
+    category: "space",
+    mode: "curated",
+    kind: "point",
+    marker: "hexagon",
+    color: PALETTE.intelSoft,
+    renderer: "both",
+    defaultEnabled: false,
+    description: "Rocket launch sites and spaceports worldwide.",
+    source: {
+      kind: "static",
+      ref: "launch-sites.geojson",
+      attribution: "Wikipedia / compiled",
+      cadence: "static",
+    },
+  },
+
+  // ----------------------------------------------------------- infrastructure
+  {
+    id: "major-ports",
+    name: "Major Ports",
+    category: "maritime",
+    mode: "curated",
+    kind: "point",
+    marker: "square",
+    color: PALETTE.intel,
+    renderer: "both",
+    defaultEnabled: false,
+    description: "World Port Index — 3,600+ ports (NGA).",
+    source: {
+      kind: "static",
+      ref: "major-ports.geojson",
+      attribution: "NGA World Port Index",
+      license: "Public Domain",
+      cadence: "30d",
+    },
+  },
+  {
+    id: "submarine-cables",
+    name: "Submarine Cables",
+    category: "infrastructure",
+    mode: "curated",
+    kind: "line",
+    marker: "ring",
+    color: PALETTE.intel,
+    renderer: "both",
+    defaultEnabled: false,
+    description: "Global subsea telecom cable routes (TeleGeography).",
+    source: {
+      kind: "static",
+      ref: "submarine-cables.geojson",
+      attribution: "TeleGeography submarinecablemap.com",
+      cadence: "7d",
+    },
+  },
+  {
+    id: "data-centers",
+    name: "Data Centers",
+    category: "infrastructure",
+    mode: "osint",
+    kind: "point",
+    marker: "square",
+    color: PALETTE.intelSoft,
+    renderer: "both",
+    defaultEnabled: false,
+    minZoom: 2,
+    description: "Global data-center facilities (cloud / colocation).",
+    source: {
+      kind: "static",
+      ref: "data-centers.geojson",
+      attribution: "Global Data Center Map (compiled)",
+      cadence: "static",
+    },
+  },
+  {
+    id: "dams",
+    name: "Dams & Reservoirs",
+    category: "infrastructure",
+    mode: "curated",
+    kind: "point",
+    marker: "circle-split",
+    color: PALETTE.intel,
+    renderer: "both",
+    defaultEnabled: false,
+    description: "Large dams (GRanD) — critical infrastructure / water targets.",
+    source: {
+      kind: "static",
+      ref: "dams.geojson",
+      attribution: "GRanD / Global Dam Watch",
+      cadence: "static",
+    },
+  },
+
+  // ----------------------------------------------------------------- energy
+  {
+    id: "mineral-deposits",
+    name: "Critical Minerals",
+    category: "energy",
+    mode: "osint",
+    kind: "point",
+    marker: "diamond",
+    color: PALETTE.gold,
+    renderer: "both",
+    defaultEnabled: false,
+    description: "Critical-mineral deposits and mines (USGS).",
+    source: {
+      kind: "static",
+      ref: "mineral-deposits.geojson",
+      attribution: "USGS",
+      license: "Public Domain",
+      cadence: "static",
+    },
+  },
+  {
+    id: "undiscovered-oil-gas",
+    name: "Undiscovered Oil & Gas",
+    category: "energy",
+    mode: "osint",
+    kind: "polygon",
+    marker: "ring",
+    color: PALETTE.gold,
+    renderer: "flat",
+    defaultEnabled: false,
+    description: "USGS assessed undiscovered petroleum provinces.",
+    source: {
+      kind: "static",
+      ref: "undiscovered-oil-gas.geojson",
+      attribution: "USGS",
+      license: "Public Domain",
+      cadence: "static",
+    },
+  },
+
+  // ---------------------------------------------------------------- conflict
+  {
+    id: "water-conflicts",
+    name: "Water Conflicts",
+    category: "conflict",
+    mode: "curated",
+    kind: "point",
+    marker: "diamond",
+    color: PALETTE.alert,
+    renderer: "both",
+    defaultEnabled: false,
+    description: "Historical & current water-related conflicts (Pacific Institute).",
+    source: {
+      kind: "static",
+      ref: "water-conflicts.geojson",
+      attribution: "Pacific Institute Water Conflict Chronology",
+      cadence: "annual",
+    },
+  },
+  {
+    id: "conflict-events",
+    name: "Conflict Events (media)",
+    category: "conflict",
+    mode: "osint",
+    kind: "point",
+    marker: "diamond",
+    color: PALETTE.alert,
+    renderer: "both",
+    defaultEnabled: false,
+    description:
+      "Media-reported battle / attack / airstrike clusters (GDELT, last 24h). Media signal, not verified events.",
+    source: {
+      kind: "api",
+      ref: "gdelt",
+      attribution: "GDELT Project",
+      cadence: "15min",
+    },
+  },
+
+  // ----------------------------------------------------------------- hazards
+  {
+    id: "earthquakes",
+    name: "Earthquakes",
+    category: "hazards",
+    mode: "osint",
+    kind: "point",
+    marker: "ring",
+    color: PALETTE.gold,
+    renderer: "both",
+    defaultEnabled: true,
+    description: "Significant seismic events, last 24h (USGS). Weak signal for large explosions.",
+    source: {
+      kind: "api",
+      ref: "earthquakes",
+      attribution: "USGS Earthquake Hazards Program",
+      license: "Public Domain",
+      cadence: "hourly",
+    },
+  },
+  {
+    id: "fires",
+    name: "Active Fires (thermal)",
+    category: "hazards",
+    mode: "osint",
+    kind: "point",
+    marker: "cross",
+    color: PALETTE.alert,
+    renderer: "both",
+    defaultEnabled: false,
+    description: "VIIRS active-fire detections, last 24h (NASA FIRMS). Weak signal for battle activity.",
+    source: {
+      kind: "api",
+      ref: "fires",
+      attribution: "NASA FIRMS",
+      cadence: "15min",
+    },
+  },
+
+  // ------------------------------------------------------------- humanitarian
+  {
+    id: "disasters",
+    name: "Disaster Events",
+    category: "humanitarian",
+    mode: "curated",
+    kind: "point",
+    marker: "cross",
+    color: PALETTE.intelSoft,
+    renderer: "both",
+    defaultEnabled: true,
+    description: "Active humanitarian disasters (ReliefWeb).",
+    source: {
+      kind: "api",
+      ref: "reliefweb",
+      attribution: "ReliefWeb (OCHA)",
+      cadence: "daily",
+    },
+  },
+
+  // ----------------------------------------------------------------- aviation
+  {
+    id: "military-flights",
+    name: "Military Flights",
+    category: "aviation",
+    mode: "osint",
+    kind: "point",
+    marker: "chevron",
+    color: PALETTE.friendly,
+    renderer: "both",
+    defaultEnabled: false,
+    description: "Live military ADS-B aircraft (adsb.lol /v2/mil).",
+    source: {
+      kind: "api",
+      ref: "flights",
+      attribution: "adsb.lol",
+      license: "ODbL",
+      cadence: "60s",
+    },
+  },
+
+  // ------------------------------------------------ Tier B (PMTiles, on-demand)
+  {
+    id: "roads",
+    name: "Road Network",
+    category: "infrastructure",
+    mode: "osint",
+    kind: "line",
+    marker: "ring",
+    color: PALETTE.outline,
+    renderer: "flat",
+    defaultEnabled: false,
+    minZoom: 4,
+    description: "Global road network (GRIP/gROADS). Heavy layer — vector tiles, loads on zoom.",
+    source: {
+      kind: "pmtiles",
+      ref: "/tiles/roads.pmtiles",
+      attribution: "GRIP4 / gROADS (GLOBIO, NASA)",
+      cadence: "static",
+    },
+  },
+  {
+    id: "oil-gas-pipelines",
+    name: "Oil & Gas Pipelines",
+    category: "energy",
+    mode: "osint",
+    kind: "line",
+    marker: "ring",
+    color: PALETTE.gold,
+    renderer: "flat",
+    defaultEnabled: false,
+    minZoom: 3,
+    description: "Global oil & gas pipeline network (OGIM / EDF). Vector tiles.",
+    source: {
+      kind: "pmtiles",
+      ref: "/tiles/oil-gas-pipelines.pmtiles",
+      attribution: "OGIM v2 (EDF / MethaneSAT)",
+      cadence: "static",
+    },
+  },
+  {
+    id: "oil-gas-wells",
+    name: "Oil & Gas Wells",
+    category: "energy",
+    mode: "osint",
+    kind: "point",
+    marker: "circle-split",
+    color: PALETTE.gold,
+    renderer: "flat",
+    defaultEnabled: false,
+    minZoom: 5,
+    description: "Global oil & gas wells (OGIM / EDF). Very dense — vector tiles.",
+    source: {
+      kind: "pmtiles",
+      ref: "/tiles/oil-gas-wells.pmtiles",
+      attribution: "OGIM v2 (EDF / MethaneSAT)",
+      cadence: "static",
+    },
+  },
+  {
+    id: "reservoirs",
+    name: "Reservoirs",
+    category: "infrastructure",
+    mode: "osint",
+    kind: "polygon",
+    marker: "ring",
+    color: PALETTE.intel,
+    renderer: "flat",
+    defaultEnabled: false,
+    minZoom: 3,
+    description: "Large reservoirs (GRanD). Vector tiles.",
+    source: {
+      kind: "pmtiles",
+      ref: "/tiles/reservoirs.pmtiles",
+      attribution: "GRanD / Global Dam Watch",
+      cadence: "static",
+    },
+  },
+
+  // -------------------------------------------------------------- information
+  {
+    id: "internet-outages",
+    name: "Internet Outages",
+    category: "information",
+    mode: "osint",
+    kind: "point",
+    marker: "cross",
+    color: PALETTE.alert,
+    renderer: "both",
+    defaultEnabled: false,
+    description: "Internet traffic anomalies & outages (Cloudflare Radar).",
+    source: {
+      kind: "api",
+      ref: "outages",
+      attribution: "Cloudflare Radar",
+      cadence: "30min",
+    },
+  },
+];
+
+export const LAYERS_BY_ID: Record<string, LayerDefinition> = Object.fromEntries(
+  LAYERS.map((l) => [l.id, l]),
+);
+
+export const CATEGORY_ORDER: LayerCategory[] = [
+  "conflict",
+  "military",
+  "aviation",
+  "maritime",
+  "space",
+  "infrastructure",
+  "energy",
+  "hazards",
+  "humanitarian",
+  "information",
+  "reference",
+];
+
+export const CATEGORY_LABELS: Record<LayerCategory, string> = {
+  conflict: "Conflict & Violence",
+  military: "Military & Strategic",
+  aviation: "Aviation",
+  maritime: "Maritime",
+  space: "Space & Orbital",
+  infrastructure: "Critical Infrastructure",
+  energy: "Energy & Resources",
+  hazards: "Hazards & Weak Signals",
+  humanitarian: "Humanitarian",
+  information: "Information Environment",
+  reference: "Reference & Context",
+};
+
+export function defaultLayerState(): Record<string, boolean> {
+  return Object.fromEntries(LAYERS.map((l) => [l.id, l.defaultEnabled]));
+}

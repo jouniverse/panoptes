@@ -1,0 +1,225 @@
+@import "tailwindcss";
+
+/*
+  Panoptes — Tactical Futurism design tokens.
+  Source: notes/ui-design/design-system/tactical-intel-core/DESIGN.md + HUD mockups.
+*/
+@theme {
+  /* Surfaces (Lights-Out base) */
+  --color-obsidian: #0a0c10;
+  --color-surface: #0c0e12;
+  --color-surface-1: #111318;
+  --color-surface-2: #14171e;
+  --color-surface-3: #1a1c20;
+  --color-surface-4: #1e2024;
+  --color-surface-5: #282a2e;
+
+  /* Functional accents */
+  --color-intel: #00d1ff; /* Intelligence Blue — neutral data / telemetry */
+  --color-intel-soft: #a4e6ff;
+  --color-alert: #ff4b2b; /* Warning Red — conflict / failure */
+  --color-gold: #ffc700; /* Command Gold — high-value targets / selection */
+  --color-friendly: #00ff41; /* Tactical Green — system health / friendly */
+
+  /* Text + lines */
+  --color-on-surface: #e2e2e8;
+  --color-on-surface-variant: #bbc9cf;
+  --color-outline: #859399;
+  --color-outline-variant: #3c494e;
+  --color-grid: #1d2127;
+
+  /* Typography */
+  --font-mono: var(--font-jetbrains), ui-monospace, "SFMono-Regular", monospace;
+  --font-body: var(--font-inter), system-ui, sans-serif;
+
+  /* Geometry */
+  --radius-none: 0px;
+  --spacing-header: 48px;
+  --spacing-rail: 232px;
+  --spacing-panel: 340px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--color-obsidian);
+  color: var(--color-on-surface);
+  font-family: var(--font-body);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* Micro-grid floor texture (Level 0). */
+.pan-grid {
+  background-color: var(--color-obsidian);
+  background-image:
+    linear-gradient(to right, var(--color-grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* Scan-line texture for glass panels (Level 1). */
+.pan-scanlines {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.025) 0px,
+    rgba(255, 255, 255, 0.025) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+}
+
+/* Frosted glass panel. */
+.pan-glass {
+  background: rgba(20, 23, 30, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--color-outline-variant);
+}
+
+/* Notched / chamfered corner (tactical hardware look). */
+.pan-notch {
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+}
+.pan-notch-tr {
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+}
+
+/* Monospaced micro-labels */
+.label-caps {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 12px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--color-on-surface-variant);
+}
+.headline-sm {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 20px;
+  letter-spacing: 0.1em;
+}
+.code-data {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-outline-variant);
+  border: 1px solid var(--color-surface);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-intel);
+}
+
+/* Custom cursor: crosshair over the geospatial surface */
+.pan-crosshair {
+  cursor: crosshair;
+}
+
+/* Status light dot */
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* MapLibre overrides so attribution/controls match the HUD */
+.maplibregl-ctrl-attrib {
+  background: rgba(10, 12, 16, 0.7) !important;
+  color: var(--color-outline) !important;
+  font-family: var(--font-mono);
+  font-size: 9px !important;
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--color-outline) !important;
+}
+.maplibregl-canvas {
+  outline: none;
+}
+
+/* Accessibility: visible keyboard focus */
+:focus-visible {
+  outline: 2px solid var(--color-intel);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pan-pulse,
+  .pan-ticker {
+    animation: none !important;
+  }
+}
+
+/* HUD corner brackets for the map surface */
+.pan-frame::before,
+.pan-frame::after {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-color: var(--color-intel);
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0.5;
+}
+.pan-frame::before {
+  top: 8px;
+  left: 8px;
+  border-top: 1px solid;
+  border-left: 1px solid;
+}
+.pan-frame::after {
+  bottom: 8px;
+  right: 8px;
+  border-bottom: 1px solid;
+  border-right: 1px solid;
+}
+
+@keyframes pan-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.pan-pulse {
+  animation: pan-pulse 2s ease-in-out infinite;
+}
+
+@keyframes pan-ticker {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+.pan-ticker {
+  animation: pan-ticker 60s linear infinite;
+  white-space: nowrap;
+}
