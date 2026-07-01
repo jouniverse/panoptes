@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { LAYERS_BY_ID } from "@/config/layer-registry";
 import { useStore } from "@/core/state/store";
 import { Stat, TacticalButton } from "@/components/ui/primitives";
@@ -11,10 +12,76 @@ const TIER_LABEL: Record<string, { text: string; color: string }> = {
   baseline: { text: "BASELINE", color: "var(--color-outline)" },
 };
 
-function fmt(v: unknown): string {
+const TEMPORAL_KEY = /(^|_)(time|date|created|updated|start|end|acq)/i;
+const ISO_DATETIME = /^\d{4}-\d{2}-\d{2}T/;
+
+function fmtDate(ms: number): string {
+  return (
+    new Date(ms).toLocaleString("en-GB", {
+      timeZone: "UTC",
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }) + " UTC"
+  );
+}
+
+/** Format a single attribute value, decoding epoch/ISO timestamps to UTC. */
+function fmtValue(key: string, v: unknown): string {
   if (v == null || v === "") return "—";
-  if (typeof v === "number") return Number.isInteger(v) ? v.toString() : v.toFixed(4);
+  // Epoch milliseconds (e.g. USGS earthquake `time`) — only treat large numbers
+  // on temporal-looking keys as dates so plain years ("2023") stay intact.
+  if (typeof v === "number") {
+    if (TEMPORAL_KEY.test(key) && v > 1e11) return fmtDate(v);
+    return Number.isInteger(v) ? v.toString() : v.toFixed(4);
+  }
+  if (typeof v === "string" && ISO_DATETIME.test(v)) {
+    const ms = Date.parse(v);
+    if (!Number.isNaN(ms)) return fmtDate(ms);
+  }
   return String(v);
+}
+
+/**
+ * Attribute row. Long values truncate by default but expand on click (and show
+ * a native tooltip), so the user can always read the full text. URL values
+ * render as links that open in a new tab.
+ */
+function AttrRow({ name, text }: { name: string; text: string }) {
+  const [open, setOpen] = useState(false);
+  const label = name.replace(/_/g, " ");
+  const isUrl = /^https?:\/\//.test(text);
+  const expandable = !isUrl && text.length > 22;
+  return (
+    <div className="flex justify-between gap-2 px-2 py-1">
+      <dt className="label-caps shrink-0 max-w-[40%] truncate" title={label}>
+        {label}
+      </dt>
+      {isUrl ? (
+        <a
+          href={text}
+          target="_blank"
+          rel="noreferrer"
+          title={text}
+          className="code-data min-w-0 flex-1 truncate text-right text-[var(--color-intel)] underline-offset-2 hover:underline"
+        >
+          {text}
+        </a>
+      ) : (
+        <dd
+          title={expandable && !open ? text : undefined}
+          onClick={expandable ? () => setOpen((o) => !o) : undefined}
+          className={`code-data min-w-0 flex-1 text-right text-[var(--color-on-surface)] ${
+            open ? "whitespace-normal break-words" : "truncate"
+          } ${expandable ? "hover:text-[var(--color-intel)]" : ""}`}
+        >
+          {text}
+        </dd>
+      )}
+    </div>
+  );
 }
 
 export function RightPanel() {
@@ -63,19 +130,21 @@ export function RightPanel() {
           )}
         </div>
 
-        <SatelliteInset lat={selected.lat} lon={selected.lon} />
+        {!layer?.approxLocation && <SatelliteInset lat={selected.lat} lon={selected.lon} />}
 
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <Stat
-            label="Coordinates"
-            value={
-              <span className="code-data">
-                {selected.lat.toFixed(4)}
-                <br />
-                {selected.lon.toFixed(4)}
-              </span>
-            }
-          />
+          {!layer?.approxLocation && (
+            <Stat
+              label="Coordinates"
+              value={
+                <span className="code-data">
+                  {selected.lat.toFixed(4)}
+                  <br />
+                  {selected.lon.toFixed(4)}
+                </span>
+              }
+            />
+          )}
           <Stat
             label="Classification"
             value={<span className="text-xs">{layer?.name ?? selected.layerId}</span>}
@@ -89,12 +158,7 @@ export function RightPanel() {
           </div>
           <dl className="divide-y divide-[var(--color-grid)]">
             {entries.map(([k, v]) => (
-              <div key={k} className="flex justify-between gap-2 px-2 py-1">
-                <dt className="label-caps">{k.replace(/_/g, " ")}</dt>
-                <dd className="code-data max-w-[180px] truncate text-right text-[var(--color-on-surface)]">
-                  {fmt(v)}
-                </dd>
-              </div>
+              <AttrRow key={k} name={k} text={fmtValue(k, v)} />
             ))}
           </dl>
         </div>
@@ -107,30 +171,32 @@ export function RightPanel() {
       </div>
 
       <footer className="border-t border-[var(--color-outline-variant)] p-2">
-        <div className="flex gap-2">
-          <TacticalButton
-            className="flex-1"
-            onClick={() =>
-              window.open(
-                `https://www.openstreetmap.org/?mlat=${selected.lat}&mlon=${selected.lon}#map=12/${selected.lat}/${selected.lon}`,
-                "_blank",
-              )
-            }
-          >
-            OPEN OSM
-          </TacticalButton>
-          <TacticalButton
-            className="flex-1"
-            onClick={() =>
-              window.open(
-                `https://browser.dataspace.copernicus.eu/?zoom=12&lat=${selected.lat}&lng=${selected.lon}`,
-                "_blank",
-              )
-            }
-          >
-            IMINT
-          </TacticalButton>
-        </div>
+        {!layer?.approxLocation && (
+          <div className="flex gap-2">
+            <TacticalButton
+              className="flex-1"
+              onClick={() =>
+                window.open(
+                  `https://www.openstreetmap.org/?mlat=${selected.lat}&mlon=${selected.lon}#map=12/${selected.lat}/${selected.lon}`,
+                  "_blank",
+                )
+              }
+            >
+              OPEN OSM
+            </TacticalButton>
+            <TacticalButton
+              className="flex-1"
+              onClick={() =>
+                window.open(
+                  `https://browser.dataspace.copernicus.eu/?zoom=12&lat=${selected.lat}&lng=${selected.lon}`,
+                  "_blank",
+                )
+              }
+            >
+              IMINT
+            </TacticalButton>
+          </div>
+        )}
         {layer?.source.attribution && (
           <div className="label-caps mt-2 text-[var(--color-outline)]">
             SRC: {layer.source.attribution}

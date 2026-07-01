@@ -16,6 +16,64 @@ import { PALETTE } from "./theme";
 export const LAYERS: LayerDefinition[] = [
   // ---------------------------------------------------------------- reference
   {
+    id: "tectonic-boundaries",
+    name: "Tectonic Boundaries",
+    category: "reference",
+    mode: "curated",
+    kind: "line",
+    marker: "ring",
+    color: "#c2550a", // rust/burnt-orange — distinct from country borders (grey)
+    renderer: "both",
+    defaultEnabled: false,
+    description: "Tectonic plate boundaries (Bird 2003, Coffin et al.). Fault context for seismic and nuclear-site analysis.",
+    source: {
+      kind: "static",
+      ref: "tectonic-boundaries.geojson",
+      attribution: "PB2002 (Bird 2003) / global-tectonic-plates",
+      license: "Public Domain",
+      cadence: "static",
+    },
+  },
+  {
+    id: "navareas",
+    name: "NAVAREA Zones",
+    category: "reference",
+    mode: "curated",
+    kind: "polygon",
+    marker: "ring",
+    color: PALETTE.intel,
+    renderer: "both",
+    defaultEnabled: false,
+    description: "IMO/IHO NAVAREA maritime broadcast zones (NGA). 21 areas worldwide; pairs with Maritime Alerts layer.",
+    source: {
+      kind: "static",
+      ref: "navareas.geojson",
+      attribution: "NGA Maritime Safety Information",
+      license: "Public Domain",
+      cadence: "static",
+    },
+  },
+  {
+    id: "urban-areas",
+    name: "Urban Areas",
+    category: "reference",
+    mode: "osint",
+    kind: "polygon",
+    marker: "ring",
+    color: "#c4a35a", // sand/amber — distinct from grey layers, reflects built-up density
+    renderer: "flat",
+    defaultEnabled: false,
+    minZoom: 3,
+    description: "Major urban extents (Natural Earth, scalerank ≤ 4). Population density context.",
+    source: {
+      kind: "static",
+      ref: "urban-areas.geojson",
+      attribution: "Natural Earth",
+      license: "Public Domain",
+      cadence: "static",
+    },
+  },
+  {
     id: "country-borders",
     name: "Country Borders",
     category: "reference",
@@ -76,6 +134,26 @@ export const LAYERS: LayerDefinition[] = [
     },
   },
   {
+    id: "satellites",
+    name: "Government & Military Satellites",
+    category: "space",
+    mode: "curated",
+    kind: "point",
+    marker: "hexagon",
+    color: PALETTE.intelSoft,
+    renderer: "both",
+    defaultEnabled: false,
+    description:
+      "Live orbital positions for government & military satellites (UCS list, ~1,300 objects). Propagated client-side from CelesTrak TLE data. Updated every 30 seconds.",
+    source: {
+      kind: "worker",
+      ref: "satellites",
+      attribution: "CelesTrak / UCS Satellite Database",
+      license: "Public Domain",
+      cadence: "30s",
+    },
+  },
+  {
     id: "launch-sites",
     name: "Launch & Spaceports",
     category: "space",
@@ -112,6 +190,46 @@ export const LAYERS: LayerDefinition[] = [
       attribution: "NGA World Port Index",
       license: "Public Domain",
       cadence: "30d",
+    },
+  },
+  {
+    id: "rivers",
+    name: "Major Rivers",
+    category: "maritime",
+    mode: "curated",
+    kind: "line",
+    marker: "ring",
+    color: PALETTE.intel,
+    renderer: "both",
+    defaultEnabled: false,
+    description: "Major navigable rivers and waterways (Natural Earth, scalerank ≤ 6).",
+    source: {
+      kind: "static",
+      ref: "rivers.geojson",
+      attribution: "Natural Earth",
+      license: "Public Domain",
+      cadence: "static",
+    },
+  },
+  {
+    id: "maritime-alerts",
+    name: "Maritime Alerts",
+    category: "maritime",
+    mode: "osint",
+    kind: "point",
+    // triangle=warning; alert red. Distinct from Military Bases (triangle+gold).
+    marker: "triangle",
+    color: PALETTE.alert,
+    renderer: "both",
+    defaultEnabled: false,
+    description:
+      "In-force NGA navigational warnings (NAVAREA/HYDRO broadcast). Positioned at each warning's first coordinate.",
+    source: {
+      kind: "api",
+      ref: "maritime-alerts",
+      attribution: "NGA Maritime Safety Information",
+      license: "Public Domain",
+      cadence: "daily",
     },
   },
   {
@@ -170,11 +288,11 @@ export const LAYERS: LayerDefinition[] = [
     },
   },
 
-  // ----------------------------------------------------------------- energy
+  // ---------------------------------------------------------- mineral resources
   {
     id: "mineral-deposits",
     name: "Critical Minerals",
-    category: "energy",
+    category: "mineral-resources",
     mode: "osint",
     kind: "point",
     marker: "diamond",
@@ -190,10 +308,11 @@ export const LAYERS: LayerDefinition[] = [
       cadence: "static",
     },
   },
+  // --------------------------------------------------------------- oil & gas
   {
     id: "undiscovered-oil-gas",
     name: "Undiscovered Oil & Gas",
-    category: "energy",
+    category: "oil-gas",
     mode: "osint",
     kind: "polygon",
     marker: "ring",
@@ -240,7 +359,7 @@ export const LAYERS: LayerDefinition[] = [
     renderer: "both",
     defaultEnabled: false,
     description:
-      "Media-reported battle / attack / airstrike clusters (GDELT, last 24h). Media signal, not verified events.",
+      "Media-reported battle / attack / airstrike clusters (GDELT, last 24h). Markers colored by coverage tone (red=highly negative → green=positive). Media signal, not verified events.",
     source: {
       kind: "api",
       ref: "gdelt",
@@ -259,11 +378,32 @@ export const LAYERS: LayerDefinition[] = [
     marker: "ring",
     color: PALETTE.gold,
     renderer: "both",
-    defaultEnabled: true,
-    description: "Significant seismic events, last 24h (USGS). Weak signal for large explosions.",
+    defaultEnabled: false,
+    description: "M2.5+ seismic events (USGS, 7-day feed). Use the 1 DAY / 7 DAYS toggle bottom-left to change the visible window. Weak signal for large explosions.",
     source: {
       kind: "api",
       ref: "earthquakes",
+      attribution: "USGS Earthquake Hazards Program",
+      license: "Public Domain",
+      cadence: "hourly",
+    },
+  },
+  {
+    id: "earthquakes-major",
+    name: "Major Earthquakes",
+    category: "hazards",
+    mode: "osint",
+    kind: "point",
+    marker: "ring",
+    color: PALETTE.alert,
+    renderer: "both",
+    defaultEnabled: false,
+    // Larger red rings so significant events stand out over the M2.5+ layer.
+    sizeScale: 1.7,
+    description: "USGS 'significant' earthquakes, last 7 days — high-impact events only. Always shows the full 7-day window. Enable alongside Earthquakes for context.",
+    source: {
+      kind: "api",
+      ref: "earthquakes-significant",
       attribution: "USGS Earthquake Hazards Program",
       license: "Public Domain",
       cadence: "hourly",
@@ -299,6 +439,9 @@ export const LAYERS: LayerDefinition[] = [
     color: PALETTE.intelSoft,
     renderer: "both",
     defaultEnabled: true,
+    // ReliefWeb only geolocates to the country centroid; markers are jittered to
+    // de-overlap, so exact coordinates are synthetic and must not be shown.
+    approxLocation: true,
     description: "Active humanitarian disasters (ReliefWeb).",
     source: {
       kind: "api",
@@ -309,6 +452,26 @@ export const LAYERS: LayerDefinition[] = [
   },
 
   // ----------------------------------------------------------------- aviation
+  {
+    id: "military-airports",
+    name: "Military Airports",
+    category: "aviation",
+    mode: "curated",
+    kind: "point",
+    marker: "square",
+    color: PALETTE.gold,
+    renderer: "both",
+    defaultEnabled: false,
+    description:
+      "Military airfields and air bases worldwide (OurAirports). ident = ICAO/local code.",
+    source: {
+      kind: "static",
+      ref: "military-airports.geojson",
+      attribution: "OurAirports (ourairports.com)",
+      license: "Public Domain",
+      cadence: "static",
+    },
+  },
   {
     id: "military-flights",
     name: "Military Flights",
@@ -352,7 +515,7 @@ export const LAYERS: LayerDefinition[] = [
   {
     id: "oil-gas-pipelines",
     name: "Oil & Gas Pipelines",
-    category: "energy",
+    category: "oil-gas",
     mode: "osint",
     kind: "line",
     marker: "ring",
@@ -371,7 +534,7 @@ export const LAYERS: LayerDefinition[] = [
   {
     id: "oil-gas-wells",
     name: "Oil & Gas Wells",
-    category: "energy",
+    category: "oil-gas",
     mode: "osint",
     kind: "point",
     marker: "circle-split",
@@ -414,7 +577,8 @@ export const LAYERS: LayerDefinition[] = [
     category: "information",
     mode: "osint",
     kind: "point",
-    marker: "cross",
+    // Distinct from Active Fires (cross/alert): outages read as a "split" signal.
+    marker: "circle-split",
     color: PALETTE.alert,
     renderer: "both",
     defaultEnabled: false,
@@ -439,7 +603,9 @@ export const CATEGORY_ORDER: LayerCategory[] = [
   "maritime",
   "space",
   "infrastructure",
-  "energy",
+  "mineral-resources",
+  "oil-gas",
+  "plants-factories",
   "hazards",
   "humanitarian",
   "information",
@@ -453,7 +619,9 @@ export const CATEGORY_LABELS: Record<LayerCategory, string> = {
   maritime: "Maritime",
   space: "Space & Orbital",
   infrastructure: "Critical Infrastructure",
-  energy: "Energy & Resources",
+  "mineral-resources": "Mineral Resources",
+  "oil-gas": "Oil & Gas",
+  "plants-factories": "Plants & Factories",
   hazards: "Hazards & Weak Signals",
   humanitarian: "Humanitarian",
   information: "Information Environment",

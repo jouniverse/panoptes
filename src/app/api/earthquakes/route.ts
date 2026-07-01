@@ -3,7 +3,7 @@ import { fetchJSON } from "@/lib/http";
 import { serveGeo, feature } from "@/lib/provider";
 
 // USGS Earthquake Hazards Program — M2.5+ last 24h. Free, no key, public domain.
-const URL = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson";
+const URL = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_week.geojson";
 
 export async function GET() {
   return serveGeo({

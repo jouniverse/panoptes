@@ -19,7 +19,7 @@ export function StatusLight({
 }) {
   return (
     <span
-      className={`status-dot ${pulse && state === "live" ? "pan-pulse" : ""}`}
+      className={`status-dot ${pulse && (state === "live" || state === "idle") ? "pan-pulse" : ""}`}
       style={{ background: HEALTH_COLOR[state], boxShadow: `0 0 6px ${HEALTH_COLOR[state]}` }}
       title={state}
     />

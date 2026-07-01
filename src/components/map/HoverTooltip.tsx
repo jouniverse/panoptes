@@ -27,9 +27,11 @@ export function HoverTooltip() {
         <div className="mt-0.5 font-mono text-xs font-bold text-[var(--color-on-surface)]">
           {hovered.label}
         </div>
-        <div className="code-data mt-0.5 text-[var(--color-outline)]">
-          {hovered.lat.toFixed(3)}, {hovered.lon.toFixed(3)}
-        </div>
+        {!layer?.approxLocation && (
+          <div className="code-data mt-0.5 text-[var(--color-outline)]">
+            {hovered.lat.toFixed(3)}, {hovered.lon.toFixed(3)}
+          </div>
+        )}
       </div>
     </div>
   );

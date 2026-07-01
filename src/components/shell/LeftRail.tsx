@@ -24,6 +24,8 @@ export function LeftRail() {
   const intelFilter = useStore((s) => s.intelFilter);
   const setIntelFilter = useStore((s) => s.setIntelFilter);
   const leftOpen = useStore((s) => s.leftOpen);
+  const collapsedCats = useStore((s) => s.collapsedCats);
+  const toggleCategory = useStore((s) => s.toggleCategory);
 
   const grouped = useMemo(() => {
     const map = new Map<LayerCategory, typeof LAYERS>();
@@ -69,16 +71,36 @@ export function LeftRail() {
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {grouped.map(({ category, layers }) => (
+        {grouped.map(({ category, layers }) => {
+          const collapsed = !!collapsedCats[category];
+          const activeCount = layers.filter((l) => enabled[l.id]).length;
+          return (
           <div key={category} className="border-b border-[var(--color-grid)]">
-            <div className="label-caps bg-[rgba(0,0,0,0.3)] px-3 py-1.5 text-[var(--color-intel)]">
-              {CATEGORY_LABELS[category]}
-            </div>
+            <button
+              type="button"
+              onClick={() => toggleCategory(category)}
+              aria-expanded={!collapsed}
+              className="label-caps flex w-full items-center gap-1.5 bg-[rgba(0,0,0,0.3)] px-3 py-1.5 text-left text-[var(--color-intel)] transition-colors hover:bg-[rgba(0,209,255,0.08)]"
+            >
+              <span className="w-2 shrink-0 text-[var(--color-outline)]">
+                {collapsed ? "▸" : "▾"}
+              </span>
+              <span className="flex-1">{CATEGORY_LABELS[category]}</span>
+              {activeCount > 0 && (
+                <span className="code-data text-[var(--color-friendly)]">
+                  {activeCount}
+                </span>
+              )}
+            </button>
+            {!collapsed && (
             <ul>
               {layers.map((l) => {
                 const on = !!enabled[l.id];
                 const h: FeedHealth = health[l.id] ?? "idle";
                 const count = counts[l.id];
+                // Enabled but no data yet (API still fetching, e.g. the large
+                // GDELT response) — show a pulsing SYNC instead of a count.
+                const loading = on && count == null && h !== "offline" && h !== "stale";
                 return (
                   <li key={l.id}>
                     <button
@@ -100,19 +122,26 @@ export function LeftRail() {
                       <span className="flex-1 truncate font-mono text-[11px] tracking-[0.04em] text-[var(--color-on-surface)]">
                         {l.name}
                       </span>
-                      {on && count != null && (
+                      {loading && (
+                        <span className="pan-pulse code-data text-[var(--color-intel)]">
+                          SYNC
+                        </span>
+                      )}
+                      {on && !loading && count != null && (
                         <span className="code-data text-[var(--color-outline)]">
                           {count > 999 ? `${(count / 1000).toFixed(1)}k` : count}
                         </span>
                       )}
-                      {on && <StatusLight state={h} />}
+                      {on && <StatusLight state={loading ? "idle" : h} pulse={loading} />}
                     </button>
                   </li>
                 );
               })}
             </ul>
+            )}
           </div>
-        ))}
+          );
+        })}
       </div>
     </aside>
   );

@@ -26,32 +26,38 @@ export async function GET() {
     load: async () => {
       if (!TOKEN) throw new Error("CLOUDFLARE_API_TOKEN not configured");
       const url =
-        "https://api.cloudflare.com/client/v4/radar/annotations/outages?limit=50&dateRange=7d&format=json";
+        "https://api.cloudflare.com/client/v4/radar/annotations/outages?limit=100&dateRange=7d&format=json";
       const json = await fetchJSON<{ result?: { annotations?: Outage[] } }>(url, {
         headers: { Authorization: `Bearer ${TOKEN}` },
       });
       const out: Feature[] = [];
+      // One outage annotation can affect several countries. Emit a marker per
+      // resolvable location instead of only the first — previously events whose
+      // first ISO code was unknown (e.g. Natural Earth "-99" codes) were dropped.
       (json.result?.annotations ?? []).forEach((o, i) => {
-        const iso = o.locations?.[0];
-        const c = iso ? CENTROIDS[iso] : undefined;
-        if (!c) return;
-        out.push(
-          feature(
-            c.lon,
-            c.lat,
-            {
-              label: `${o.eventType ?? "OUTAGE"} · ${c.name}`,
-              description: o.description,
-              eventType: o.eventType,
-              start: o.startDate,
-              end: o.endDate,
-              asns: o.asns?.join(", "),
-              time: o.startDate ? Date.parse(o.startDate) : undefined,
-              url: o.linkedUrl,
-            },
-            `cf-${i}`,
-          ),
-        );
+        const codes = o.locations?.length ? o.locations : [];
+        codes.forEach((raw, j) => {
+          const iso = (raw || "").toUpperCase();
+          const c = CENTROIDS[iso];
+          if (!c) return;
+          out.push(
+            feature(
+              c.lon,
+              c.lat,
+              {
+                label: `${o.eventType ?? "OUTAGE"} · ${c.name}`,
+                description: o.description,
+                eventType: o.eventType,
+                start: o.startDate,
+                end: o.endDate,
+                asns: o.asns?.join(", "),
+                time: o.startDate ? Date.parse(o.startDate) : undefined,
+                url: o.linkedUrl,
+              },
+              `cf-${i}-${j}`,
+            ),
+          );
+        });
       });
       return out;
     },

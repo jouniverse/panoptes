@@ -9,8 +9,9 @@ import { hexToRgba, RGB, type RGBA } from "@/config/theme";
 import type { GeoEntity, LayerDefinition } from "@/core/types";
 import type { LayerData } from "@/hooks/useLayerData";
 import { getMarkerAtlas } from "./markers";
-import { clusterPoints, clusterExpansionZoom, CLUSTER_THRESHOLD } from "./clustering";
+import { clusterPoints, clusterExpansionZoom, getClusterLeafIndices, CLUSTER_THRESHOLD } from "./clustering";
 import { pmtilesLayer } from "./pmtiles";
+import { markerColorFor, toneToColor } from "@/config/marker-style";
 
 interface BuildArgs {
   data: Record<string, LayerData>;
@@ -25,6 +26,7 @@ export function useDeckLayers({ data, zoom, onClusterClick }: BuildArgs): Layer[
   const select = useStore((s) => s.select);
   const hover = useStore((s) => s.hover);
   const timeline = useStore((s) => s.timeline);
+  const eqWindowDays = useStore((s) => s.eqWindowDays);
 
   const tlEnabled = timeline.enabled;
   const tlLo = timeline.current - timeline.windowMs;
@@ -60,6 +62,11 @@ export function useDeckLayers({ data, zoom, onClusterClick }: BuildArgs): Layer[
         // Timeline filter: only constrains entities that carry a timestamp;
         // static/reference layers (no timestamp) always remain visible.
         let entities = ld.entities;
+        // Earthquakes: client-side 1d/7d window over the 7-day USGS feed.
+        if (def.id === "earthquakes" && eqWindowDays < 7) {
+          const cutoff = Date.now() - eqWindowDays * 24 * 60 * 60_000;
+          entities = entities.filter((e) => e.timestamp == null || e.timestamp >= cutoff);
+        }
         if (tlEnabled) {
           const hasTime = entities.some((e) => e.timestamp != null);
           if (hasTime) {
@@ -75,7 +82,7 @@ export function useDeckLayers({ data, zoom, onClusterClick }: BuildArgs): Layer[
     }
     return layers;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, enabled, intelFilter, zoomBucket, selectedId, tlEnabled, tlLo, tlHi]);
+  }, [data, enabled, intelFilter, zoomBucket, selectedId, tlEnabled, tlLo, tlHi, eqWindowDays]);
 }
 
 function buildVectorLayer(
@@ -127,6 +134,23 @@ function buildPointLayers(
   const clusters = points.filter((p) => p.isCluster);
   const leaves = points.filter((p) => !p.isCluster).map((p) => p.entity!) as GeoEntity[];
 
+  // Precompute per-cluster average tone for tone-colored layers (GDELT).
+  // Done once per zoom/data change, not in the getFillColor accessor.
+  const clusterToneMap = new Map<number, RGBA>();
+  if (def.id === "conflict-events") {
+    for (const c of clusters) {
+      if (c.clusterId == null) continue;
+      const indices = getClusterLeafIndices(def.id, c.clusterId);
+      const tones = indices
+        .map((i) => entities[i]?.properties?.tone)
+        .filter((t): t is number => typeof t === "number");
+      if (tones.length) {
+        const avg = tones.reduce((a, b) => a + b, 0) / tones.length;
+        clusterToneMap.set(c.clusterId, toneToColor(avg));
+      }
+    }
+  }
+
   // cluster bubbles
   out.push(
     new ScatterplotLayer({
@@ -138,14 +162,24 @@ function buildPointLayers(
       radiusUnits: "pixels",
       getPosition: (d: { lon: number; lat: number }) => [d.lon, d.lat],
       getRadius: (d: { count?: number }) => 10 + Math.min(18, Math.log2((d.count ?? 2) + 1) * 3),
-      getFillColor: [color[0], color[1], color[2], 38] as RGBA,
-      getLineColor: color,
+      getFillColor: (d: { clusterId?: number }) => {
+        const tc = d.clusterId != null ? clusterToneMap.get(d.clusterId) : undefined;
+        return tc ? ([tc[0], tc[1], tc[2], 50] as RGBA) : ([color[0], color[1], color[2], 38] as RGBA);
+      },
+      getLineColor: (d: { clusterId?: number }) => {
+        const tc = d.clusterId != null ? clusterToneMap.get(d.clusterId) : undefined;
+        return tc ?? color;
+      },
       lineWidthMinPixels: 1.5,
       onClick: (info: PickingInfo) => {
         const c = info.object as { lon: number; lat: number; clusterId?: number };
         if (c?.clusterId != null) {
           onClusterClick(c.lon, c.lat, clusterExpansionZoom(def.id, c.clusterId));
         }
+      },
+      updateTriggers: {
+        getFillColor: [def.id, clusters.length],
+        getLineColor: [def.id, clusters.length],
       },
     }),
   );
@@ -161,6 +195,9 @@ function buildPointLayers(
       getColor: RGB.onSurface,
       getTextAnchor: "middle",
       getAlignmentBaseline: "center",
+      // Billboards are otherwise depth-occluded by the globe sphere (invisible
+      // numbers in GlobeView); draw them on top (luma v9: depth test always passes).
+      parameters: { depthCompare: "always" },
     }),
   );
   out.push(markerLayer(def, leaves, color, atlas, selectedId, select, hover));
@@ -176,6 +213,9 @@ function markerLayer(
   select: (e: GeoEntity | null) => void,
   hover: (e: GeoEntity | null, screen?: { x: number; y: number } | null) => void,
 ): Layer {
+  // Optional per-entity colour (age, active/inactive, …); falls back to the
+  // layer's flat colour when no resolver is registered for this layer.
+  const colorFn = markerColorFor(def.id);
   return new IconLayer<GeoEntity>({
     id: `layer-${def.id}`,
     data: entities,
@@ -185,10 +225,19 @@ function markerLayer(
     getIcon: () => def.marker,
     getPosition: (d) => [d.lon, d.lat],
     getSize: (d) =>
-      (d.id === selectedId ? 26 : 18) * (1 + (d.severity ?? 0) * 0.6),
+      (d.id === selectedId ? 26 : 18) *
+      (1 + (d.severity ?? 0) * 0.6) *
+      (def.sizeScale ?? 1),
     sizeUnits: "pixels",
-    getColor: (d) =>
-      d.id === selectedId ? RGB.gold : ([color[0], color[1], color[2], 235] as RGBA),
+    getColor: (d) => {
+      const base = colorFn ? colorFn(d) : ([color[0], color[1], color[2], 235] as RGBA);
+      if (d.id === selectedId) {
+        // For tone/age-colored layers keep the entity color (size is the selection
+        // cue). For flat-color layers flash gold so selection is unmissable.
+        return colorFn ? ([base[0], base[1], base[2], 255] as RGBA) : RGB.gold;
+      }
+      return base;
+    },
     getAngle: (d) =>
       def.marker === "chevron" && typeof d.properties.heading === "number"
         ? -(d.properties.heading as number)
@@ -202,6 +251,10 @@ function markerLayer(
         info.object ? { x: info.x, y: info.y } : null,
       );
     },
+    // Without this, icon billboards are hidden behind the globe sphere in
+    // GlobeView (markers invisible). depthCompare "always" draws them on top;
+    // far-side markers also show through — an acceptable trade-off for visibility.
+    parameters: { depthCompare: "always" },
     updateTriggers: {
       getSize: [selectedId],
       getColor: [selectedId],

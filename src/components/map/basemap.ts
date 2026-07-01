@@ -18,9 +18,14 @@ export function basemapLayer() {
     maxCacheSize: 300,
     renderSubLayers: (props) => {
       const tile = props.tile as unknown as {
-        boundingBox: [[number, number], [number, number]];
+        boundingBox?: [[number, number], [number, number]];
       };
-      const [[west, south], [east, north]] = tile.boundingBox;
+      // Guard: in some view/tiling states (notably GlobeView) boundingBox can be
+      // momentarily undefined. Destructuring it then throws "reading '0'", which
+      // breaks deck.gl's render loop and leaves both globe and map uninteractive.
+      const bbox = tile?.boundingBox;
+      if (!bbox) return null;
+      const [[west, south], [east, north]] = bbox;
       return new BitmapLayer({
         id: `${props.id}-bitmap`,
         image: props.data as unknown as string,

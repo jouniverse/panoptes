@@ -11,7 +11,13 @@
  * Heavy Tier B datasets (roads, night-lights, OGIM) are NOT handled here — see
  * scripts/build-tiles.mjs (PMTiles pipeline).
  */
-import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from "node:fs";
+import {
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  existsSync,
+  statSync,
+} from "node:fs";
 import { join } from "node:path";
 
 const ROOT = process.cwd();
@@ -44,7 +50,11 @@ function write(name, features) {
 }
 
 function pt(lon, lat, props) {
-  return { type: "Feature", geometry: { type: "Point", coordinates: [lon, lat] }, properties: props };
+  return {
+    type: "Feature",
+    geometry: { type: "Point", coordinates: [lon, lat] },
+    properties: props,
+  };
 }
 
 /** Minimal RFC-4180-ish CSV parser (handles quoted fields, commas, quotes). */
@@ -57,16 +67,28 @@ function parseCSV(text) {
     const c = text[i];
     if (inQuotes) {
       if (c === '"') {
-        if (text[i + 1] === '"') { field += '"'; i++; }
-        else inQuotes = false;
+        if (text[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else inQuotes = false;
       } else field += c;
     } else if (c === '"') inQuotes = true;
-    else if (c === ",") { row.push(field); field = ""; }
-    else if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
-    else if (c === "\r") { /* skip */ }
-    else field += c;
+    else if (c === ",") {
+      row.push(field);
+      field = "";
+    } else if (c === "\n") {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = "";
+    } else if (c === "\r") {
+      /* skip */
+    } else field += c;
   }
-  if (field.length || row.length) { row.push(field); rows.push(row); }
+  if (field.length || row.length) {
+    row.push(field);
+    rows.push(row);
+  }
   return rows;
 }
 
@@ -77,19 +99,35 @@ const tasks = {
       type: "Feature",
       geometry: f.geometry,
       properties: pick(f.properties, [
-        "NAME", "ADMIN", "ISO_A3", "CONTINENT", "SUBREGION", "POP_EST", "GDP_MD", "ECONOMY",
+        "NAME",
+        "ADMIN",
+        "ISO_A3",
+        "CONTINENT",
+        "SUBREGION",
+        "POP_EST",
+        "GDP_MD",
+        "ECONOMY",
       ]),
     }));
     write("country-borders.geojson", features);
   },
 
   "populated-places.geojson"() {
-    const fc = readJSON(join(SRC, "populated-places/populated-places-simple.geojson"));
+    const fc = readJSON(
+      join(SRC, "populated-places/populated-places-simple.geojson"),
+    );
     const features = fc.features.map((f) => ({
       type: "Feature",
       geometry: f.geometry,
       properties: pick(f.properties, [
-        "NAME", "name", "NAMEASCII", "nameascii", "ADM0NAME", "adm0name", "POP_MAX", "pop_max",
+        "NAME",
+        "name",
+        "NAMEASCII",
+        "nameascii",
+        "ADM0NAME",
+        "adm0name",
+        "POP_MAX",
+        "pop_max",
         "FEATURECLA",
       ]),
     }));
@@ -97,13 +135,24 @@ const tasks = {
   },
 
   "military-bases.geojson"() {
-    const fc = readJSON(join(SRC, "military-bases/military-bases.geojson"));
+    const fc = readJSON(join(SRC, "military-bases/all-military-bases.geojson"));
     const features = fc.features
       .filter((f) => f.geometry)
       .map((f) => ({
         type: "Feature",
         geometry: f.geometry,
-        properties: pick(f.properties, ["name", "description"]),
+        // Keep the descriptive fields so the right panel is useful (operator,
+        // host country/region, service component, nearest city, description).
+        properties: pick(f.properties, [
+          "name",
+          "operator_country",
+          "location_country",
+          "location_region",
+          "service_component",
+          "nearest_city",
+          "description",
+          "source",
+        ]),
       }));
     write("military-bases.geojson", features);
   },
@@ -134,7 +183,11 @@ const tasks = {
         type: "Feature",
         geometry: f.geometry,
         properties: pick(f.properties, [
-          "PORT_NAME", "COUNTRY", "HARBORSIZE", "HARBORTYPE", "INDEX_NO",
+          "PORT_NAME",
+          "COUNTRY",
+          "HARBORSIZE",
+          "HARBORTYPE",
+          "INDEX_NO",
         ]),
       }));
     write("major-ports.geojson", features);
@@ -151,57 +204,94 @@ const tasks = {
   },
 
   "data-centers.geojson"() {
-    const list = readJSON(join(SRC, "data-centers/datacenters.json"));
-    const features = list
-      .filter((d) => Array.isArray(d.city_coords) && d.city_coords.length === 2)
-      .map((d) => {
-        const [lat, lon] = d.city_coords;
-        return pt(lon, lat, {
-          name: d.name,
-          company: d.company,
-          city: d.city,
-          country: d.country,
-        });
-      });
+    // Updated source is a GeoJSON FeatureCollection (was a JSON array of
+    // {city_coords}). Geometry is already [lon, lat]; keep the correct fields
+    // so the right panel shows name / company / city / country accurately.
+    const fc = readJSON(join(SRC, "data-centers/datacenters.geojson"));
+    const features = fc.features
+      .filter(
+        (f) =>
+          f.geometry &&
+          Array.isArray(f.geometry.coordinates) &&
+          f.geometry.coordinates.length === 2,
+      )
+      .map((f) => ({
+        type: "Feature",
+        geometry: f.geometry,
+        properties: pick(f.properties, [
+          "name",
+          "company",
+          "city",
+          "country",
+          "street",
+          "address",
+        ]),
+      }));
     write("data-centers.geojson", features);
   },
 
   "dams.geojson"() {
-    const fc = readJSON(join(SRC, "reservoirs-and-dams/dams.geojson"));
+    const fc = readJSON(join(SRC, "dams-and-reservoirs/dams.geojson"));
     const features = fc.features
       .filter((f) => f.geometry)
       .map((f) => ({
         type: "Feature",
         geometry: f.geometry,
         properties: pick(f.properties, [
-          "DAM_NAME", "RES_NAME", "RIVER", "COUNTRY", "YEAR", "DAM_HGT_M", "AREA_SKM", "CAP_MCM", "MAIN_USE",
+          "DAM_NAME",
+          "RES_NAME",
+          "RIVER",
+          "COUNTRY",
+          "YEAR",
+          "DAM_HGT_M",
+          "AREA_SKM",
+          "CAP_MCM",
+          "MAIN_USE",
         ]),
       }));
     write("dams.geojson", features);
   },
 
   "mineral-deposits.geojson"() {
-    const fc = readJSON(join(SRC, "mines-and-mineral-deposits/critical-minerals-deposits-and-mines.geojson"));
+    const fc = readJSON(
+      join(
+        SRC,
+        "mines-and-mineral-deposits/critical-minerals-deposits-and-mines.geojson",
+      ),
+    );
     const features = fc.features
       .filter((f) => f.geometry)
       .map((f) => ({
         type: "Feature",
         geometry: f.geometry,
         properties: pick(f.properties, [
-          "DEPOSIT_NAME", "CRITICAL_MINERAL", "DEPOSIT_TYPE", "LOCATION",
+          "DEPOSIT_NAME",
+          "CRITICAL_MINERAL",
+          "DEPOSIT_TYPE",
+          "LOCATION",
         ]),
       }));
     write("mineral-deposits.geojson", features);
   },
 
   "undiscovered-oil-gas.geojson"() {
-    const fc = readJSON(join(SRC, "undiscovered-oil-and-gas-resources/undiscovered-oil-and-gas-resources.geojson"));
+    const fc = readJSON(
+      join(
+        SRC,
+        "undiscovered-oil-and-gas-resources/undiscovered-oil-and-gas-resources.geojson",
+      ),
+    );
     const features = fc.features
       .filter((f) => f.geometry)
       .map((f) => ({
         type: "Feature",
         geometry: f.geometry,
-        properties: pick(f.properties, ["AU_NAME", "PRV_NAME", "REG_NAME", "TPS_NAME"]),
+        properties: pick(f.properties, [
+          "AU_NAME",
+          "PRV_NAME",
+          "REG_NAME",
+          "TPS_NAME",
+        ]),
       }));
     write("undiscovered-oil-gas.geojson", features);
   },
@@ -209,7 +299,10 @@ const tasks = {
   "country-centroids.json"() {
     const fc = readJSON(join(SRC, "country-maps-geojson/countries.geojson"));
     const flatten = (coords, acc) => {
-      if (typeof coords[0] === "number") { acc.push(coords); return; }
+      if (typeof coords[0] === "number") {
+        acc.push(coords);
+        return;
+      }
       for (const c of coords) flatten(c, acc);
     };
     const out = {};
@@ -218,18 +311,31 @@ const tasks = {
       const acc = [];
       flatten(f.geometry.coordinates, acc);
       if (!acc.length) continue;
-      let x = 0, y = 0;
-      for (const [lon, lat] of acc) { x += lon; y += lat; }
+      let x = 0,
+        y = 0;
+      for (const [lon, lat] of acc) {
+        x += lon;
+        y += lat;
+      }
       const lon = x / acc.length;
       const lat = y / acc.length;
       const p = f.properties;
-      const rec = { lon, lat, name: p.NAME || p.ADMIN, iso3: p.ISO_A3 };
-      if (p.ISO_A2 && p.ISO_A2 !== "-99") out[p.ISO_A2] = rec;
-      if (p.ISO_A3 && p.ISO_A3 !== "-99") out[p.ISO_A3] = rec;
+      // Natural Earth sets ISO_A2/ISO_A3 to "-99" for several countries
+      // (France, Norway, etc.); fall back to the *_EH variants so downstream
+      // ISO-code lookups (e.g. internet outages) resolve them.
+      const a2 = [p.ISO_A2, p.ISO_A2_EH, p.WB_A2].find((v) => v && v !== "-99");
+      const a3 = [p.ISO_A3, p.ISO_A3_EH, p.WB_A3, p.ADM0_A3].find(
+        (v) => v && v !== "-99",
+      );
+      const rec = { lon, lat, name: p.NAME || p.ADMIN, iso3: a3 };
+      if (a2) out[a2] = rec;
+      if (a3) out[a3] = rec;
     }
     const path = join(DATA, "country-centroids.json");
     writeFileSync(path, JSON.stringify(out));
-    log(`wrote src/data/country-centroids.json  (${Object.keys(out).length} keys)`);
+    log(
+      `wrote src/data/country-centroids.json  (${Object.keys(out).length} keys)`,
+    );
   },
 
   "country-indicators.json"() {
@@ -244,13 +350,21 @@ const tasks = {
     const nameToIso = {};
 
     const readCsv = (p) => parseCSV(readFileSync(join(SRC, p), "utf8"));
-    const num = (v) => { const n = parseFloat(v); return Number.isNaN(n) ? undefined : n; };
+    const num = (v) => {
+      const n = parseFloat(v);
+      return Number.isNaN(n) ? undefined : n;
+    };
 
     // Global Peace Index (current) — geocode + overall score + rank
     try {
-      const rows = readCsv("global-peace-and-terrorism-index/global-peace-index-2026-details.csv");
+      const rows = readCsv(
+        "global-indices/global-peace-and-terrorism-index/global-peace-index-2026-details.csv",
+      );
       const h = rows[0];
-      const ci = h.indexOf("country"), gi = h.indexOf("geocode"), si = h.indexOf("Overall Score"), ri = h.indexOf("Rank");
+      const ci = h.indexOf("country"),
+        gi = h.indexOf("geocode"),
+        si = h.indexOf("Overall Score"),
+        ri = h.indexOf("Rank");
       for (let r = 1; r < rows.length; r++) {
         const iso = rows[r][gi];
         const rec = ensure(iso, rows[r][ci]);
@@ -259,74 +373,114 @@ const tasks = {
         rec.gpiRank = num(rows[r][ri]);
         nameToIso[norm(rows[r][ci])] = iso;
       }
-    } catch (e) { log("  indicators: GPI skipped", e.message); }
+    } catch (e) {
+      log("  indicators: GPI skipped", e.message);
+    }
 
     // Global Terrorism Index — latest year per iso3c
     try {
-      const rows = readCsv("global-peace-and-terrorism-index/global-terrorism-index.csv");
+      const rows = readCsv(
+        "global-indices/global-peace-and-terrorism-index/global-terrorism-index.csv",
+      );
       const h = rows[0];
-      const ii = h.indexOf("iso3c"), yi = h.indexOf("year"), si = h.indexOf("Score"), ci = h.indexOf("Country");
+      const ii = h.indexOf("iso3c"),
+        yi = h.indexOf("year"),
+        si = h.indexOf("Score"),
+        ci = h.indexOf("Country");
       const latest = {};
       for (let r = 1; r < rows.length; r++) {
-        const iso = rows[r][ii]; const y = num(rows[r][yi]);
+        const iso = rows[r][ii];
+        const y = num(rows[r][yi]);
         if (!iso || y == null) continue;
-        if (!latest[iso] || y > latest[iso].y) latest[iso] = { y, score: num(rows[r][si]), name: rows[r][ci] };
+        if (!latest[iso] || y > latest[iso].y)
+          latest[iso] = { y, score: num(rows[r][si]), name: rows[r][ci] };
       }
       for (const [iso, v] of Object.entries(latest)) {
-        const rec = ensure(iso, v.name); if (rec) rec.gti = v.score;
+        const rec = ensure(iso, v.name);
+        if (rec) rec.gti = v.score;
         nameToIso[norm(v.name)] = iso;
       }
-    } catch (e) { log("  indicators: GTI skipped", e.message); }
+    } catch (e) {
+      log("  indicators: GTI skipped", e.message);
+    }
 
     // Global Conflict Risk Index — latest year per ISO, conflict intensity
     try {
-      const rows = readCsv("global-conflict-risk-index/global-conflict-risk-index.csv");
+      const rows = readCsv(
+        "global-indices/global-conflict-risk-index/global-conflict-risk-index.csv",
+      );
       const h = rows[0];
-      const ii = h.indexOf("ISO"), yi = h.indexOf("YEAR"), ci = h.indexOf("COUNTRY"), vi = h.indexOf("CON_INT");
+      const ii = h.indexOf("ISO"),
+        yi = h.indexOf("YEAR"),
+        ci = h.indexOf("COUNTRY"),
+        vi = h.indexOf("CON_INT");
       const latest = {};
       for (let r = 1; r < rows.length; r++) {
-        const iso = rows[r][ii]; const y = num(rows[r][yi]);
+        const iso = rows[r][ii];
+        const y = num(rows[r][yi]);
         if (!iso || y == null) continue;
-        if (!latest[iso] || y > latest[iso].y) latest[iso] = { y, v: num(rows[r][vi]), name: rows[r][ci] };
+        if (!latest[iso] || y > latest[iso].y)
+          latest[iso] = { y, v: num(rows[r][vi]), name: rows[r][ci] };
       }
       for (const [iso, v] of Object.entries(latest)) {
-        const rec = ensure(iso, v.name); if (rec) rec.gcri = v.v;
+        const rec = ensure(iso, v.name);
+        if (rec) rec.gcri = v.v;
       }
-    } catch (e) { log("  indicators: GCRI skipped", e.message); }
+    } catch (e) {
+      log("  indicators: GCRI skipped", e.message);
+    }
 
     // Fragile States Index — join by name
     try {
-      const rows = readCsv("fragile-states-index/fragile-states-index.csv");
+      const rows = readCsv(
+        "global-indices/fragile-states-index/fragile-states-index.csv",
+      );
       const h = rows[0];
-      const ci = h.indexOf("Country"), ti = h.indexOf("Total");
+      const ci = h.indexOf("Country"),
+        ti = h.indexOf("Total");
       for (let r = 1; r < rows.length; r++) {
         const iso = nameToIso[norm(rows[r][ci])];
-        const rec = ensure(iso, rows[r][ci]); if (rec) rec.fsi = num(rows[r][ti]);
+        const rec = ensure(iso, rows[r][ci]);
+        if (rec) rec.fsi = num(rows[r][ti]);
       }
-    } catch (e) { log("  indicators: FSI skipped", e.message); }
+    } catch (e) {
+      log("  indicators: FSI skipped", e.message);
+    }
 
     // Global Hunger Index — join by name, 2025 column
     try {
-      const rows = readCsv("global-hunger-index/global-hunger-index-2025.csv");
+      const rows = readCsv(
+        "global-indices/global-hunger-index/global-hunger-index-2025.csv",
+      );
       const h = rows[0];
-      const ci = 0, gi = h.indexOf("2025");
+      const ci = 0,
+        gi = h.indexOf("2025");
       for (let r = 1; r < rows.length; r++) {
         const iso = nameToIso[norm(rows[r][ci])];
-        const rec = ensure(iso, rows[r][ci]); if (rec) rec.ghi = num(rows[r][gi]);
+        const rec = ensure(iso, rows[r][ci]);
+        if (rec) rec.ghi = num(rows[r][gi]);
       }
-    } catch (e) { log("  indicators: GHI skipped", e.message); }
+    } catch (e) {
+      log("  indicators: GHI skipped", e.message);
+    }
 
     const path = join(PUBDATA, "country-indicators.json");
     writeFileSync(path, JSON.stringify(ind));
-    log(`wrote public/data/country-indicators.json  (${Object.keys(ind).length} countries)`);
+    log(
+      `wrote public/data/country-indicators.json  (${Object.keys(ind).length} countries)`,
+    );
   },
 
   "water-conflicts.geojson"() {
-    const text = readFileSync(join(SRC, "water-conflicts/water-conflicts.csv"), "utf8");
+    const text = readFileSync(
+      join(SRC, "water-conflicts/water-conflicts.csv"),
+      "utf8",
+    );
     const rows = parseCSV(text);
     const header = rows[0];
     const idx = (name) => header.indexOf(name);
-    const iLat = idx("Latitude"), iLon = idx("Longitude");
+    const iLat = idx("Latitude"),
+      iLon = idx("Longitude");
     const features = [];
     for (let r = 1; r < rows.length; r++) {
       const row = rows[r];
@@ -346,17 +500,92 @@ const tasks = {
     }
     write("water-conflicts.geojson", features);
   },
+
+  "military-airports.geojson"() {
+    const fc = readJSON(join(SRC, "airports/military-airports.geojson"));
+    const features = fc.features
+      .filter((f) => f.geometry)
+      .map((f) => ({
+        type: "Feature",
+        geometry: f.geometry,
+        properties: pick(f.properties, [
+          "name",
+          "ident",
+          "type",
+          "iso_country",
+          "municipality",
+          "icao_code",
+          "elevation_ft",
+        ]),
+      }));
+    write("military-airports.geojson", features);
+  },
+
+  "rivers.geojson"() {
+    const fc = readJSON(join(SRC, "rivers/rivers.geojson"));
+    const features = fc.features
+      .filter((f) => f.geometry && (f.properties.scalerank ?? 99) <= 6)
+      .map((f) => ({
+        type: "Feature",
+        geometry: f.geometry,
+        properties: pick(f.properties, ["name", "name_en", "scalerank"]),
+      }));
+    write("rivers.geojson", features);
+  },
+
+  "tectonic-boundaries.geojson"() {
+    const fc = readJSON(
+      join(SRC, "tectonic-plates/tectonic-plates-boundaries.json"),
+    );
+    const features = fc.features
+      .filter((f) => f.geometry)
+      .map((f) => ({
+        type: "Feature",
+        geometry: f.geometry,
+        properties: pick(f.properties, ["Name", "PlateA", "PlateB", "Type"]),
+      }));
+    write("tectonic-boundaries.geojson", features);
+  },
+
+  "navareas.geojson"() {
+    const fc = readJSON(join(SRC, "nga-alerts/navareas.geojson"));
+    const features = fc.features
+      .filter((f) => f.geometry)
+      .map((f) => ({
+        type: "Feature",
+        geometry: f.geometry,
+        properties: pick(f.properties, ["navarea", "coordinator"]),
+      }));
+    write("navareas.geojson", features);
+  },
+
+  "urban-areas.geojson"() {
+    const fc = readJSON(join(SRC, "urban-areas/urban-areas.geojson"));
+    const features = fc.features
+      .filter((f) => f.geometry && (f.properties.scalerank ?? 99) <= 4)
+      .map((f) => ({
+        type: "Feature",
+        geometry: f.geometry,
+        properties: pick(f.properties, ["scalerank", "area_sqkm"]),
+      }));
+    write("urban-areas.geojson", features);
+  },
 };
 
 const only = process.argv.slice(2);
-const names = only.length
-  ? only.map((n) => (n.endsWith(".geojson") ? n : `${n}.geojson`))
-  : Object.keys(tasks);
+// Resolve a CLI arg to a task key: accept exact name, or with .geojson/.json
+// suffixes (some tasks emit .json, e.g. country-centroids / country-indicators).
+const resolve = (n) =>
+  [n, `${n}.geojson`, `${n}.json`].find((k) => tasks[k]) ?? `${n}.geojson`;
+const names = only.length ? only.map(resolve) : Object.keys(tasks);
 
 let ok = 0;
 for (const name of names) {
   const fn = tasks[name];
-  if (!fn) { log(`! no task for ${name}`); continue; }
+  if (!fn) {
+    log(`! no task for ${name}`);
+    continue;
+  }
   try {
     if (!existsSync(SRC)) throw new Error("static-data/ not found");
     fn();

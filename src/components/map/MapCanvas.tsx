@@ -2,7 +2,12 @@
 
 import { useCallback, useMemo } from "react";
 import DeckGL from "@deck.gl/react";
-import { MapView, _GlobeView as GlobeView } from "@deck.gl/core";
+import {
+  MapView,
+  MapController,
+  _GlobeView as GlobeView,
+  _GlobeController as GlobeController,
+} from "@deck.gl/core";
 import type { Layer } from "@deck.gl/core";
 import { useStore, type ViewState } from "@/core/state/store";
 import { useLayerData } from "@/hooks/useLayerData";
@@ -33,11 +38,16 @@ export default function MapCanvas() {
   const base = useMemo(() => basemapLayer() as unknown as Layer, []);
   const layers: Layer[] = useMemo(() => [base, ...dataLayers], [base, dataLayers]);
 
+  // Distinct view ids per projection: when the id stays the same, deck.gl reuses
+  // the existing controller instance, so switching MapView -> GlobeView left a
+  // MapController driving a GlobeViewport (MapState.pan/zoom call
+  // GlobeViewport.panByPosition with the wrong arity -> "reading '0'" crash).
+  // Different ids force the controller to be recreated for the new view.
   const view = useMemo(
     () =>
       projection === "globe"
-        ? new GlobeView({ id: "main" })
-        : new MapView({ id: "main", repeat: true }),
+        ? new GlobeView({ id: "globe" })
+        : new MapView({ id: "map", repeat: true }),
     [projection],
   );
 
@@ -59,11 +69,17 @@ export default function MapCanvas() {
       views={view}
       viewState={viewState}
       onViewStateChange={(e) => handleViewState(e.viewState as Partial<ViewState>)}
-      controller={{ doubleClickZoom: true, inertia: 250 }}
+      controller={{
+        // Pin the controller class to the active projection so a GlobeViewport is
+        // never driven by a MapController (and vice versa).
+        type: projection === "globe" ? GlobeController : MapController,
+        doubleClickZoom: true,
+        inertia: 250,
+      }}
       layers={layers}
-      getCursor={({ isDragging, isHovering }) =>
-        isDragging ? "grabbing" : isHovering ? "pointer" : "crosshair"
-      }
+      // Always the tactical crosshair — never the browser pointer (hover) or
+      // grab/grabbing hand (drag). Notes lines 15 / 1285.
+      getCursor={() => "crosshair"}
       onClick={(info) => {
         if (!info.object) select(null);
       }}

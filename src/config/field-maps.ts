@@ -11,9 +11,14 @@ const confirmed = (): SourceTier => "confirmed";
 export const FIELD_MAPS: Record<string, EntityFieldMap> = {
   "country-borders": { label: ["NAME", "ADMIN", "name"] },
   "populated-places": { label: ["NAME", "name", "nameascii"] },
-  "military-bases": { label: ["name", "label"], tier: confirmed },
+  "military-bases": { label: ["name", "label", "nearest_city"], tier: confirmed },
   "launch-sites": { label: ["Location", "label", "name"], tier: confirmed },
   "major-ports": { label: ["PORT_NAME", "label"], tier: confirmed },
+  "maritime-alerts": {
+    label: ["label", "region"],
+    tier: confirmed,
+    timestamp: (p) => (typeof p.time === "number" ? p.time : undefined),
+  },
   "submarine-cables": { label: ["name", "label"], tier: confirmed },
   "data-centers": { label: ["name", "company", "label"] },
   dams: { label: ["DAM_NAME", "RES_NAME", "label"], tier: confirmed },
@@ -30,6 +35,12 @@ export const FIELD_MAPS: Record<string, EntityFieldMap> = {
     tier: () => "estimated",
   },
   earthquakes: {
+    label: ["label", "place", "title"],
+    severity: (p) => (typeof p.mag === "number" ? Math.min(1, p.mag / 9) : undefined),
+    timestamp: (p) => (typeof p.time === "number" ? p.time : undefined),
+    tier: confirmed,
+  },
+  "earthquakes-major": {
     label: ["label", "place", "title"],
     severity: (p) => (typeof p.mag === "number" ? Math.min(1, p.mag / 9) : undefined),
     timestamp: (p) => (typeof p.time === "number" ? p.time : undefined),
@@ -52,6 +63,14 @@ export const FIELD_MAPS: Record<string, EntityFieldMap> = {
     tier: () => "estimated",
     timestamp: (p) => (typeof p.time === "number" ? p.time : undefined),
   },
+  // §3.2
+  "military-airports": { label: ["name", "ident", "icao_code"], tier: confirmed },
+  // §3.5
+  rivers: { label: ["name_en", "name"] },
+  // §3.6
+  "tectonic-boundaries": { label: ["Name", "Type"] },
+  navareas: { label: ["navarea", "coordinator"] },
+  "urban-areas": { label: ["area_sqkm"] },
 };
 
 export function fieldMapFor(layerId: string): EntityFieldMap {

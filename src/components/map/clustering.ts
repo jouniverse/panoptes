@@ -72,3 +72,19 @@ export function clusterExpansionZoom(layerId: string, clusterId: number): number
     return 4;
   }
 }
+
+/**
+ * Returns the entity-array indices for all leaves in a cluster.
+ * Used to aggregate per-entity properties (e.g. avg tone) at cluster level.
+ */
+export function getClusterLeafIndices(layerId: string, clusterId: number): number[] {
+  const hit = cache.get(layerId);
+  if (!hit) return [];
+  try {
+    return hit.sc
+      .getLeaves(clusterId, Infinity)
+      .map((f) => (f.properties as { i: number }).i);
+  } catch {
+    return [];
+  }
+}

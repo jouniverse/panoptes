@@ -57,11 +57,13 @@ export type RendererSupport = "flat" | "globe" | "both";
 export type LayerCategory =
   | "conflict"
   | "military"
-  | "infrastructure"
-  | "energy"
   | "aviation"
   | "maritime"
   | "space"
+  | "infrastructure"
+  | "mineral-resources"
+  | "oil-gas"
+  | "plants-factories"
   | "hazards"
   | "humanitarian"
   | "information"
@@ -71,7 +73,8 @@ export type LayerCategory =
 export type IntelMode = "curated" | "osint";
 
 export interface LayerSource {
-  kind: "static" | "api" | "pmtiles";
+  /** worker = live data from a client-side Web Worker (not fetched via GeoJSON). */
+  kind: "static" | "api" | "pmtiles" | "worker";
   /** For static: path under /geo. For api: route under /api. For pmtiles: url. */
   ref: string;
   /** Free-text provenance shown in the UI + attribution. */
@@ -96,6 +99,14 @@ export interface LayerDefinition {
   description: string;
   /** Only render at/above this zoom (perf gating for dense layers). */
   minZoom?: number;
+  /** Multiplier on base marker size (e.g. overlay layers that must stand out). */
+  sizeScale?: number;
+  /**
+   * Entity positions are NOT a true geolocation (e.g. snapped to a country
+   * centroid, then jittered to de-overlap). Suppresses coordinate readouts /
+   * imagery deep-links that would be misleading.
+   */
+  approxLocation?: boolean;
   /** Lazy import of the layer module (transform + deck layer factory). */
   load?: () => Promise<unknown>;
 }

@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { LeftRail } from "@/components/shell/LeftRail";
 import { RightPanel } from "@/components/shell/RightPanel";
 import { MapControls } from "@/components/map/MapControls";
+import { MapLegend } from "@/components/map/MapLegend";
 import { HoverTooltip } from "@/components/map/HoverTooltip";
 import { TimelineBar } from "@/components/map/TimelineBar";
 
@@ -26,6 +27,7 @@ export function GeospatialView() {
       <div className="pan-crosshair pan-frame relative flex min-w-0 flex-1">
         <MapCanvas />
         <MapControls />
+        <MapLegend />
         <HoverTooltip />
         <TimelineBar />
       </div>

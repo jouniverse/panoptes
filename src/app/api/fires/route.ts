@@ -4,7 +4,7 @@ import { serveGeo, feature } from "@/lib/provider";
 
 // NASA FIRMS VIIRS active fires (last 24h). Needs a free MAP_KEY; without it the
 // layer degrades to empty (health=stale) rather than failing the UI.
-const MAP_KEY = process.env.FIRMS_MAP_KEY;
+const MAP_KEY = process.env.NASA_FIRMS_MAP_KEY;
 const MAX_POINTS = 4000;
 
 export async function GET() {
@@ -12,7 +12,7 @@ export async function GET() {
     key: "firms-fires",
     ttlMs: 15 * 60_000,
     load: async () => {
-      if (!MAP_KEY) throw new Error("FIRMS_MAP_KEY not configured");
+      if (!MAP_KEY) throw new Error("NASA_FIRMS_MAP_KEY not configured");
       const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${MAP_KEY}/VIIRS_SNPP_NRT/world/1`;
       const csv = await fetchText(url, {}, 15_000);
       const lines = csv.trim().split("\n");

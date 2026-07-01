@@ -46,7 +46,10 @@ export function useLayerData(): Record<string, LayerData> {
   const active = useMemo(
     () =>
       LAYERS.filter(
-        (l) => enabled[l.id] && l.source.kind !== "pmtiles",
+        (l) =>
+          enabled[l.id] &&
+          l.source.kind !== "pmtiles" &&
+          l.source.kind !== "worker",
       ),
     [enabled],
   );

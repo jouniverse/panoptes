@@ -138,6 +138,26 @@ body {
   cursor: crosshair;
 }
 
+/* Custom cursor everywhere — the tactical crosshair must persist across the
+   whole app (panels, buttons, links), not just the map (notes lines 15 / 1225).
+   Text-entry fields keep a caret so typing/selection stays usable. */
+body {
+  cursor: crosshair;
+}
+button,
+a,
+summary,
+[role="button"],
+[role="tab"] {
+  cursor: crosshair;
+}
+input,
+textarea,
+select,
+[contenteditable="true"] {
+  cursor: text;
+}
+
 /* Status light dot */
 .status-dot {
   width: 7px;
