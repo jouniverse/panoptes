@@ -88,7 +88,8 @@ export interface LayerDefinition {
   id: string;
   name: string;
   category: LayerCategory;
-  mode: IntelMode;
+  /** Which left-rail tabs show this layer (ALL always shows every layer). */
+  modes: IntelMode[];
   kind: LayerKind;
   marker: MarkerShape;
   color: string; // hex from PALETTE

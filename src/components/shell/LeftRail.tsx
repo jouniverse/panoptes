@@ -5,6 +5,7 @@ import {
   CATEGORY_LABELS,
   CATEGORY_ORDER,
   LAYERS,
+  layerInIntelMode,
 } from "@/config/layer-registry";
 import { useStore, type IntelFilter } from "@/core/state/store";
 import type { FeedHealth, LayerCategory } from "@/core/types";
@@ -30,7 +31,7 @@ export function LeftRail() {
   const grouped = useMemo(() => {
     const map = new Map<LayerCategory, typeof LAYERS>();
     for (const l of LAYERS) {
-      if (intelFilter !== "all" && l.mode !== intelFilter) continue;
+      if (intelFilter !== "all" && !layerInIntelMode(l, intelFilter)) continue;
       if (!map.has(l.category)) map.set(l.category, []);
       map.get(l.category)!.push(l);
     }

@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { IconLayer, ScatterplotLayer, TextLayer, GeoJsonLayer } from "@deck.gl/layers";
 import type { Layer, PickingInfo } from "@deck.gl/core";
-import { LAYERS } from "@/config/layer-registry";
+import { LAYERS, layerInIntelMode } from "@/config/layer-registry";
 import { useStore } from "@/core/state/store";
 import { hexToRgba, RGB, type RGBA } from "@/config/theme";
 import type { GeoEntity, LayerDefinition } from "@/core/types";
@@ -41,7 +41,7 @@ export function useDeckLayers({ data, zoom, onClusterClick }: BuildArgs): Layer[
 
     for (const def of LAYERS) {
       if (!enabled[def.id]) continue;
-      if (intelFilter !== "all" && def.mode !== intelFilter) continue;
+      if (intelFilter !== "all" && !layerInIntelMode(def, intelFilter)) continue;
       if (def.minZoom != null && zoom < def.minZoom) continue;
 
       // Tier B: vector tiles streamed directly from a PMTiles archive.

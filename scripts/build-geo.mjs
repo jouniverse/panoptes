@@ -1557,16 +1557,25 @@ const tasks = {
     for (const row of list) {
       const hex = String(row.icao24 ?? "").toLowerCase();
       if (!/^[0-9a-f]{6}$/.test(hex)) continue;
+      const op = row.intelsky_operator || row.operator || row.owner;
+      const reg = row.registration || row.intelsky_registration;
+      const type = row.intelsky_type || row.typecode;
+      const desc = row.intelsky_description
+        ? String(row.intelsky_description).slice(0, 80)
+        : undefined;
       const entry = pick(
         {
-          c: row.country,
-          o: row.operator,
-          w: row.owner,
-          r: row.registration,
-          t: row.typecode,
-          m: row.military_reason,
+          c: row.country || undefined,
+          o: op || undefined,
+          w: row.owner || undefined,
+          r: reg && reg !== "-UNKNOWN-" ? reg : undefined,
+          t: type || undefined,
+          m: row.military_reason || undefined,
+          s: row.match_status || undefined,
+          n: row.source_count != null ? row.source_count : undefined,
+          d: desc,
         },
-        ["c", "o", "w", "r", "t", "m"],
+        ["c", "o", "w", "r", "t", "m", "s", "n", "d"],
       );
       out[hex] = entry;
     }

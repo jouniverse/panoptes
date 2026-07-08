@@ -76,7 +76,7 @@ export const FIELD_MAPS: Record<string, EntityFieldMap> = {
   },
   disasters: { label: ["name", "label", "title"], tier: confirmed },
   "military-flights": {
-    label: ["callsign", "label", "registration"],
+    label: ["callsign", "label", "registration", "description"],
     tier: confirmed,
     timestamp: (p) => (typeof p.time === "number" ? p.time : undefined),
   },

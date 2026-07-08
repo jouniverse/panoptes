@@ -81,7 +81,7 @@ export function OpsEconomicsPanel({
           {extended ? "Show core tickers" : "Show extended tickers"}
         </button>
         <div className="border-t border-[var(--color-grid)] px-3 py-2">
-          <div className="label-caps mb-1 text-[var(--color-gold)]">Oil & Energy // EIA</div>
+          <div className="label-caps mb-1 text-[var(--color-gold)]">Oil & Energy // EIA+FRED</div>
           {(eia?.series ?? []).map((s) => (
             <div key={s.id} className="mb-1 flex justify-between gap-2 font-mono text-[10px]">
               <span className="text-[var(--color-on-surface-variant)]">{s.name}</span>

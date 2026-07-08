@@ -39,7 +39,7 @@ export function OpsView() {
   const spaceNewsPayload = spaceNews.items[0] as { news?: unknown[]; launches?: unknown[] } | undefined;
 
   const sources = [
-    { name: "ADS-B MIL (adsb.lol)", health: flights.health, count: flights.items.length },
+    { name: "MIL ADS-B (IntelSky + adsb.lol)", health: flights.health, count: flights.items.length },
     { name: "MARITIME ALERTS (NGA MSI)", health: alerts.health, count: alerts.items.length },
     { name: "ORBITAL (gov/mil)", health: sats.health as FeedHealth, count: sats.positions.length },
     { name: "AVIATION NEWS RSS", health: aviationNews.health, count: aviationNews.items.length },

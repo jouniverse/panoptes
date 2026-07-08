@@ -31,6 +31,12 @@ export function OpsAviationPanel({
 
   return (
     <Panel title="AVIATION // MIL ADS-B" status={health} className="lg:col-span-1">
+      <div className="px-3 py-2">
+        <span className="font-mono text-2xl font-bold text-[var(--color-intel)]">
+          {features.length}
+        </span>
+        <span className="label-caps ml-2 text-[var(--color-outline)]">MIL AIRCRAFT TRACKED</span>
+      </div>
       <FeedList
         rows={rows}
         empty="No military aircraft in view"
