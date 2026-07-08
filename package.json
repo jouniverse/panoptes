@@ -11,7 +11,9 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "geo:build": "node scripts/build-geo.mjs",
-    "geo:tiles": "node scripts/build-tiles.mjs"
+    "geo:tiles": "node scripts/build-tiles.mjs",
+    "analytics:cache": "node scripts/fetch-analytics-cache.mjs",
+    "tles:fetch": "npx tsx scripts/fetch-gov-military-tles.ts"
   },
   "dependencies": {
     "@deck.gl/aggregation-layers": "^9.3.4",

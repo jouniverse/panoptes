@@ -158,6 +158,45 @@ select,
   cursor: text;
 }
 
+/* Tailwind cursor-pointer must not override the tactical crosshair in OPS panels */
+.cursor-pointer {
+  cursor: crosshair;
+}
+
+/* OPS situational-awareness map marker */
+.ops-map-marker {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--color-intel);
+  border-radius: 50%;
+  background: rgba(0, 209, 255, 0.2);
+  box-shadow:
+    0 0 10px rgba(0, 209, 255, 0.55),
+    inset 0 0 6px rgba(0, 209, 255, 0.35);
+  position: relative;
+}
+.ops-map-marker::before,
+.ops-map-marker::after {
+  content: "";
+  position: absolute;
+  background: var(--color-intel);
+  opacity: 0.85;
+}
+.ops-map-marker::before {
+  width: 2px;
+  height: 14px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+.ops-map-marker::after {
+  width: 14px;
+  height: 2px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
 /* Status light dot */
 .status-dot {
   width: 7px;

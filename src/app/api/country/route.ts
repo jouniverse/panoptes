@@ -1,73 +1,87 @@
 import { NextResponse } from "next/server";
-import { fetchJSON } from "@/lib/http";
 import { cacheGet, cacheSet } from "@/lib/cache";
+import { cacheTtl } from "@/config/cache-schedule";
+import { EMPTY_COUNTRY_SERIES, normalizeCountryPayload } from "@/lib/country-payload";
+import { battleDeathsFor, homicidesFor } from "@/lib/static-data";
+import { getWbCountryData, wbCountryFromFile } from "@/lib/wb-country-cache";
 
-export const maxDuration = 25;
-
-// World Bank Open Data — free, no key. Strategic country indicators + a
-// military-expenditure time series for the analytics profile.
-const INDICATORS = {
-  gdp: "NY.GDP.MKTP.CD",
-  population: "SP.POP.TOTL",
-  milExp: "MS.MIL.XPND.CD",
-  milExpPctGdp: "MS.MIL.XPND.GD.ZS",
-  personnel: "MS.MIL.TOTL.P1",
-} as const;
-
-type Key = keyof typeof INDICATORS;
-
-interface WBPoint {
-  date: string;
-  value: number | null;
-}
-
-async function series(iso: string, indicator: string): Promise<{ year: number; value: number }[]> {
-  const url = `https://api.worldbank.org/v2/country/${iso}/indicator/${indicator}?format=json&per_page=70`;
-  const json = await fetchJSON<[unknown, WBPoint[] | null]>(url);
-  const rows = json[1] ?? [];
-  return rows
-    .filter((r) => r.value != null)
-    .map((r) => ({ year: parseInt(r.date, 10), value: r.value as number }))
-    .sort((a, b) => a.year - b.year);
-}
-
-function latest(s: { year: number; value: number }[]): number | undefined {
-  return s.length ? s[s.length - 1].value : undefined;
-}
+export const maxDuration = 60;
 
 export async function GET(req: Request) {
   const iso = (new URL(req.url).searchParams.get("iso") || "").toUpperCase();
   if (!/^[A-Z]{3}$/.test(iso)) {
     return NextResponse.json({ error: "iso (3-letter) required" }, { status: 400 });
   }
-  const key = `country:${iso}`;
+
+  const ttl = cacheTtl("world-bank:country");
+  const key = `country:v4:${iso}`;
   const cached = cacheGet<unknown>(key);
-  if (cached && cached.age < 24 * 3_600_000) {
-    return NextResponse.json(cached.data, { headers: { "X-Panoptes-Health": "live" } });
+  if (cached && cached.age < ttl) {
+    return NextResponse.json(normalizeCountryPayload(cached.data, iso), {
+      headers: { "X-Panoptes-Health": "live" },
+    });
   }
 
   try {
-    const entries = await Promise.all(
-      (Object.entries(INDICATORS) as [Key, string][]).map(async ([k, ind]) => [k, await series(iso, ind)] as const),
-    );
-    const byKey = Object.fromEntries(entries) as Record<Key, { year: number; value: number }[]>;
-    const result = {
+    const wb = await getWbCountryData(iso);
+    const { tracked: battleTracked, series: battleDeaths } = battleDeathsFor(iso);
+    const hom = homicidesFor(iso);
+    const homicide = hom.country;
+    const homicideWorld = hom.world;
+
+    const latest = wb.latest;
+    const result = normalizeCountryPayload({
       iso,
       latest: {
-        gdp: latest(byKey.gdp),
-        population: latest(byKey.population),
-        milExp: latest(byKey.milExp),
-        milExpPctGdp: latest(byKey.milExpPctGdp),
-        personnel: latest(byKey.personnel),
+        gdp: latest.gdp,
+        population: latest.population,
+        milExp: latest.milExp,
+        milExpPctGdp: latest.milExpPctGdp,
+        personnel: latest.personnel,
+        gdpGrowth: latest.gdpGrowth,
+        inflation: latest.inflation,
+        currentAccount: latest.currentAccount,
+        battleDeaths: battleDeaths.length ? battleDeaths[battleDeaths.length - 1]?.value : undefined,
+        battleDeathsYear: battleDeaths.length ? battleDeaths[battleDeaths.length - 1]?.year : undefined,
+        battleDeathsTracked: battleTracked,
+        homicideRate: homicide.length ? homicide[homicide.length - 1]?.value : undefined,
+        homicideYear: homicide.length ? homicide[homicide.length - 1]?.year : undefined,
+        homicideWorldRate: homicideWorld.length ? homicideWorld[homicideWorld.length - 1]?.value : undefined,
+        homicideWorldYear: homicideWorld.length ? homicideWorld[homicideWorld.length - 1]?.year : undefined,
+        armsImports: latest.armsImports,
+        armsImportsYear: latest.armsImportsYear,
+        armsExports: latest.armsExports,
+        armsExportsYear: latest.armsExportsYear,
       },
-      series: { milExp: byKey.milExp, milExpPctGdp: byKey.milExpPctGdp },
-    };
+      series: {
+        milExp: wb.series.milExp,
+        milExpPctGdp: wb.series.milExpPctGdp,
+        battleDeaths,
+        homicide,
+        homicideWorld,
+      },
+      macro: {
+        gdpGrowth: latest.gdpGrowth,
+        inflation: latest.inflation,
+        currentAccount: latest.currentAccount,
+      },
+    }, iso);
+
     cacheSet(key, result);
-    return NextResponse.json(result, { headers: { "X-Panoptes-Health": "live" } });
+    return NextResponse.json(result, {
+      headers: { "X-Panoptes-Health": wbCountryFromFile(iso) ? "cached" : "live" },
+    });
   } catch (e) {
-    if (cached) return NextResponse.json(cached.data, { headers: { "X-Panoptes-Health": "degraded" } });
+    if (cached) {
+      return NextResponse.json(normalizeCountryPayload(cached.data, iso), {
+        headers: { "X-Panoptes-Health": "degraded" },
+      });
+    }
     return NextResponse.json(
-      { iso, latest: {}, series: { milExp: [] }, error: String(e).slice(0, 120) },
+      normalizeCountryPayload(
+        { iso, latest: {}, series: EMPTY_COUNTRY_SERIES(), error: String(e).slice(0, 120) },
+        iso,
+      ),
       { headers: { "X-Panoptes-Health": "stale" } },
     );
   }

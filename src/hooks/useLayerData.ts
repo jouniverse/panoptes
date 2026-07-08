@@ -48,6 +48,7 @@ export function useLayerData(): Record<string, LayerData> {
       LAYERS.filter(
         (l) =>
           enabled[l.id] &&
+          !l.placeholder &&
           l.source.kind !== "pmtiles" &&
           l.source.kind !== "worker",
       ),

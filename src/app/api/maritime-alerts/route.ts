@@ -1,6 +1,6 @@
 import type { Feature } from "geojson";
 import { fetchText } from "@/lib/http";
-import { serveGeo, feature } from "@/lib/provider";
+import { serveGeo } from "@/lib/provider";
 
 /**
  * NGA Maritime Safety Information — in-force navigational warnings.
@@ -72,8 +72,8 @@ interface ParsedWarn {
   region: string | undefined;
   issued: string;
   time: number | undefined;
-  lon: number;
-  lat: number;
+  lon?: number;
+  lat?: number;
   text: string;
 }
 
@@ -85,7 +85,6 @@ function parseBulletin(area: string, body: string): ParsedWarn[] {
     const time = parseIssue(lines[0]);
     if (time == null) continue; // header / boilerplate, not a warning
     const pos = firstPosition(block);
-    if (!pos) continue; // positionless notice
 
     const refIdx = lines.findIndex((l) => REF.test(l));
     const refLine = refIdx >= 0 ? lines[refIdx] : `${area}`;
@@ -108,8 +107,7 @@ function parseBulletin(area: string, body: string): ParsedWarn[] {
       region,
       issued: lines[0],
       time,
-      lon: pos[0],
-      lat: pos[1],
+      ...(pos ? { lon: pos[0], lat: pos[1] } : {}),
       text: block.trim().slice(0, 700),
     });
   }
@@ -130,21 +128,22 @@ export async function GET() {
       if (warns.length === 0) {
         throw new Error("NGA MSI: all DailyMem bulletins empty or unreachable");
       }
-      return warns.map<Feature>((w) =>
-        feature(
-          w.lon,
-          w.lat,
-          {
-            label: w.ref,
-            region: w.region,
-            nav_area: w.area,
-            issued: w.issued,
-            time: w.time,
-            text: w.text,
-          },
-          `msi-${w.ref.replace(/\s+/g, "-")}`,
-        ),
-      );
+      return warns.map<Feature>((w) => ({
+        type: "Feature",
+        id: `msi-${w.ref.replace(/\s+/g, "-")}`,
+        geometry:
+          w.lon != null && w.lat != null
+            ? { type: "Point", coordinates: [w.lon, w.lat] }
+            : null,
+        properties: {
+          label: w.ref,
+          region: w.region,
+          nav_area: w.area,
+          issued: w.issued,
+          time: w.time,
+          text: w.text,
+        },
+      } as Feature));
     },
   });
 }

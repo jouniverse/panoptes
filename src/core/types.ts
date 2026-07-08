@@ -107,6 +107,8 @@ export interface LayerDefinition {
    * imagery deep-links that would be misleading.
    */
   approxLocation?: boolean;
+  /** Layer shown in the rail but not yet implemented (cannot be toggled on). */
+  placeholder?: boolean;
   /** Lazy import of the layer module (transform + deck layer factory). */
   load?: () => Promise<unknown>;
 }

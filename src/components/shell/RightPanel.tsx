@@ -5,6 +5,8 @@ import { LAYERS_BY_ID } from "@/config/layer-registry";
 import { useStore } from "@/core/state/store";
 import { Stat, TacticalButton } from "@/components/ui/primitives";
 import { SatelliteInset } from "@/components/ui/SatelliteInset";
+import { AirportWeather } from "@/components/panels/AirportWeather";
+import { FlightIntel } from "@/components/panels/FlightIntel";
 
 const TIER_LABEL: Record<string, { text: string; color: string }> = {
   confirmed: { text: "OSINT CONFIRMED", color: "var(--color-friendly)" },
@@ -97,6 +99,16 @@ export function RightPanel() {
     .filter(([, v]) => v != null && v !== "")
     .slice(0, 14);
 
+  const icao =
+    (selected.properties.icao_code as string | undefined)?.trim() ||
+    (selected.properties.ident as string | undefined)?.trim();
+  const showWeather =
+    selected.layerId === "military-airports" &&
+    icao &&
+    /^[A-Za-z0-9]{3,4}$/.test(icao);
+  const flightHex = selected.properties.hex as string | undefined;
+  const showFlightIntel = selected.layerId === "military-flights" && !!flightHex;
+
   return (
     <aside
       aria-label="Entity intelligence"
@@ -168,6 +180,18 @@ export function RightPanel() {
             {layer.description}
           </p>
         )}
+
+        {showWeather && (
+          <AirportWeather
+            icao={icao.toUpperCase()}
+            lon={selected.lon}
+            lat={selected.lat}
+            country={(selected.properties.iso_country as string | undefined)?.trim()}
+          />
+        )}
+        {showFlightIntel && flightHex && (
+          <FlightIntel hex={flightHex} properties={selected.properties} />
+        )}
       </div>
 
       <footer className="border-t border-[var(--color-outline-variant)] p-2">
@@ -183,6 +207,17 @@ export function RightPanel() {
               }
             >
               OPEN OSM
+            </TacticalButton>
+            <TacticalButton
+              className="flex-1"
+              onClick={() =>
+                window.open(
+                  `https://www.google.com/maps?q=${selected.lat},${selected.lon}&z=12`,
+                  "_blank",
+                )
+              }
+            >
+              GOOGLE MAPS
             </TacticalButton>
             <TacticalButton
               className="flex-1"

@@ -43,6 +43,14 @@ function launchSiteColor(e: GeoEntity): RGBA {
     : hexToRgba(PALETTE.outline, 150); // decommissioned — muted grey
 }
 
+/** Closed military airfields — muted; operational bases keep layer gold. */
+function militaryAirportColor(e: GeoEntity): RGBA {
+  const t = String(e.properties.type ?? "").toLowerCase();
+  return t === "closed"
+    ? hexToRgba(PALETTE.outline, 150)
+    : hexToRgba(PALETTE.gold, 235);
+}
+
 /**
  * GDELT "tone" is theoretically −100..+100, but for a news query the values
  * cluster tightly around 0 (observed for our conflict query: ~−15..+10, median
@@ -99,6 +107,16 @@ function maritimeAlertColor(e: GeoEntity): RGBA {
   return hexToRgba(PALETTE.alert, 235);
 }
 
+/** COW MIDLOC: disputes (MIDLOCA) vs incidents (MIDLOCI). */
+function historicalConflictColor(e: GeoEntity): RGBA {
+  const rt = String(e.properties.record_type ?? "");
+  const ds = String(e.properties.source_dataset ?? "");
+  const incident = rt === "incident" || ds.includes("MIDLOCI");
+  return incident
+    ? hexToRgba(PALETTE.alert, 220) // violent incidents — red
+    : hexToRgba(PALETTE.gold, 220); // interstate disputes — gold
+}
+
 const POWER_FUEL_COLORS: Partial<Record<string, RGBA>> = {
   Nuclear: hexToRgba("#ff4b2b", 230), // alert red
   Hydro: hexToRgba(PALETTE.intel, 210), // cyan
@@ -119,9 +137,11 @@ function powerPlantColor(e: GeoEntity): RGBA {
 export const MARKER_COLORS: Record<string, MarkerColorFn> = {
   "water-conflicts": waterConflictColor,
   "launch-sites": launchSiteColor,
+  "military-airports": militaryAirportColor,
   "conflict-events": gdeltToneColor,
   "maritime-alerts": maritimeAlertColor,
   "power-plants": powerPlantColor,
+  "historical-conflicts": historicalConflictColor,
 };
 
 export function markerColorFor(layerId: string): MarkerColorFn | undefined {

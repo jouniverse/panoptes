@@ -73,7 +73,7 @@ export function LeftRail() {
       <div className="flex-1 overflow-y-auto">
         {grouped.map(({ category, layers }) => {
           const collapsed = !!collapsedCats[category];
-          const activeCount = layers.filter((l) => enabled[l.id]).length;
+          const activeCount = layers.filter((l) => !l.placeholder && enabled[l.id]).length;
           return (
           <div key={category} className="border-b border-[var(--color-grid)]">
             <button
@@ -95,7 +95,8 @@ export function LeftRail() {
             {!collapsed && (
             <ul>
               {layers.map((l) => {
-                const on = !!enabled[l.id];
+                const placeholder = !!l.placeholder;
+                const on = !placeholder && !!enabled[l.id];
                 const h: FeedHealth = health[l.id] ?? "idle";
                 const count = counts[l.id];
                 // Enabled but no data yet (API still fetching, e.g. the large
@@ -105,11 +106,14 @@ export function LeftRail() {
                   <li key={l.id}>
                     <button
                       type="button"
-                      onClick={() => toggleLayer(l.id)}
+                      disabled={placeholder}
+                      onClick={() => !placeholder && toggleLayer(l.id)}
                       title={l.description}
-                      className={`flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-[rgba(0,209,255,0.06)] ${
-                        on ? "" : "opacity-50"
-                      }`}
+                      className={`flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors ${
+                        placeholder
+                          ? "cursor-not-allowed opacity-35"
+                          : "hover:bg-[rgba(0,209,255,0.06)]"
+                      } ${on ? "" : placeholder ? "" : "opacity-50"}`}
                     >
                       <span
                         className="inline-block h-2.5 w-2.5 shrink-0 border"
@@ -122,6 +126,11 @@ export function LeftRail() {
                       <span className="flex-1 truncate font-mono text-[11px] tracking-[0.04em] text-[var(--color-on-surface)]">
                         {l.name}
                       </span>
+                      {placeholder && (
+                        <span className="code-data text-[9px] text-[var(--color-outline)]">
+                          SOON
+                        </span>
+                      )}
                       {loading && (
                         <span className="pan-pulse code-data text-[var(--color-intel)]">
                           SYNC

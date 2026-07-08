@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { fetchText } from "@/lib/http";
 import { cacheGet, cacheSet } from "@/lib/cache";
+import { parseRssFeed } from "@/lib/rss";
 
 // Multi-perspective RSS aggregation. Pulling several state/independent outlets
 // side-by-side surfaces narrative divergence — a deliberate OSINT technique,
@@ -25,41 +26,6 @@ interface NewsItem {
   ts: number;
 }
 
-function clean(s: string): string {
-  return s
-    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&")
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&quot;/g, '"')
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .trim();
-}
-
-function tag(block: string, name: string): string | undefined {
-  const m = block.match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)</${name}>`, "i"));
-  return m ? clean(m[1]) : undefined;
-}
-
-function parseFeed(xml: string, source: string, perspective: string): NewsItem[] {
-  const blocks = xml.match(/<(item|entry)[\s\S]*?<\/(item|entry)>/gi) ?? [];
-  const items: NewsItem[] = [];
-  for (const b of blocks.slice(0, 12)) {
-    const title = tag(b, "title");
-    if (!title) continue;
-    let link = tag(b, "link");
-    if (!link) {
-      const m = b.match(/<link[^>]*href="([^"]+)"/i);
-      link = m?.[1];
-    }
-    const date = tag(b, "pubDate") || tag(b, "published") || tag(b, "updated");
-    const ts = date ? Date.parse(date) : Date.now();
-    items.push({ title, link: link || "", source, perspective, date, ts: Number.isNaN(ts) ? Date.now() : ts });
-  }
-  return items;
-}
-
 export async function GET() {
   const key = "news";
   const cached = cacheGet<NewsItem[]>(key);
@@ -67,7 +33,12 @@ export async function GET() {
     return NextResponse.json({ items: cached.data }, { headers: { "X-Panoptes-Health": "live" } });
   }
   const results = await Promise.allSettled(
-    FEEDS.map(async (f) => parseFeed(await fetchText(f.url, {}, 8000), f.source, f.perspective)),
+    FEEDS.map(async (f) =>
+      parseRssFeed(await fetchText(f.url, {}, 8000), f.source, f.perspective).map((i) => ({
+        ...i,
+        perspective: f.perspective,
+      })),
+    ),
   );
   const items = results
     .flatMap((r) => (r.status === "fulfilled" ? r.value : []))

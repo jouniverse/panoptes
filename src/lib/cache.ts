@@ -17,8 +17,8 @@ export function cacheGet<T>(key: string): { data: T; age: number } | null {
 
 export function cacheSet<T>(key: string, data: T): void {
   store.set(key, { data, ts: Date.now() });
-  // crude memory bound
-  if (store.size > 64) {
+  // crude memory bound — country profiles generate many keys
+  if (store.size > 256) {
     const oldest = [...store.entries()].sort((a, b) => a[1].ts - b[1].ts)[0];
     if (oldest) store.delete(oldest[0]);
   }
