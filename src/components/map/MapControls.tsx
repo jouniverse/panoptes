@@ -34,6 +34,8 @@ function Btn({
 export function MapControls() {
   const projection = useStore((s) => s.projection);
   const setProjection = useStore((s) => s.setProjection);
+  const basemapStyle = useStore((s) => s.basemapStyle);
+  const setBasemapStyle = useStore((s) => s.setBasemapStyle);
   const view = useStore((s) => s.viewState);
   const setView = useStore((s) => s.setViewState);
   const toggleLeft = useStore((s) => s.toggleLeft);
@@ -61,6 +63,21 @@ export function MapControls() {
         title="3D globe"
       >
         ◍
+      </Btn>
+      <div className="h-px w-8 bg-[var(--color-outline-variant)]" />
+      <Btn
+        onClick={() => setBasemapStyle("strategic")}
+        active={basemapStyle === "strategic"}
+        title="Strategic basemap (dark)"
+      >
+        ▓
+      </Btn>
+      <Btn
+        onClick={() => setBasemapStyle("satellite")}
+        active={basemapStyle === "satellite"}
+        title="Satellite imagery (Esri)"
+      >
+        ◉
       </Btn>
       <div className="h-px w-8 bg-[var(--color-outline-variant)]" />
       <Btn onClick={() => zoomBy(1)} title="Zoom in">

@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import DeckGL from "@deck.gl/react";
+import { PathLayer } from "@deck.gl/layers";
 import {
   MapView,
   MapController,
@@ -18,6 +19,8 @@ import { basemapLayer } from "./basemap";
 import { useDeckLayers } from "./useDeckLayers";
 import type { GeoEntity, FeedHealth } from "@/core/types";
 import type { LayerData } from "@/hooks/useLayerData";
+import { computeOrbitGroundTrack, orbitTrackPathsForProjection } from "@/lib/satellite-track";
+import { RGB } from "@/config/theme";
 import satMeta from "@/data/military-satellites-meta.json";
 
 const EMPTY_FC: FeatureCollection = { type: "FeatureCollection", features: [] };
@@ -31,10 +34,12 @@ const SAT_META = satMeta as Record<
 export default function MapCanvas() {
   useUrlSync();
   const projection = useStore((s) => s.projection);
+  const basemapStyle = useStore((s) => s.basemapStyle);
   const viewState = useStore((s) => s.viewState);
   const setViewState = useStore((s) => s.setViewState);
   const select = useStore((s) => s.select);
   const hover = useStore((s) => s.hover);
+  const selected = useStore((s) => s.selected);
   const enabled = useStore((s) => s.enabled);
   const setHealth = useStore((s) => s.setHealth);
   const setCount = useStore((s) => s.setCount);
@@ -42,7 +47,7 @@ export default function MapCanvas() {
   // Satellite layer: live TLE propagation in a Web Worker.
   // Only activated when the layer is toggled on (saves resources).
   const satEnabled = !!enabled["satellites"];
-  const { positions: satPositions, health: satHealthRaw } = useSatellites(
+  const { positions: satPositions, health: satHealthRaw, tles: satTles } = useSatellites(
     "gov-military",
     satEnabled,
   );
@@ -100,11 +105,76 @@ export default function MapCanvas() {
     [setViewState],
   );
 
-  const dataLayers = useDeckLayers({ data, zoom: viewState.zoom, onClusterClick });
+  const dataLayers = useDeckLayers({
+    data,
+    zoom: viewState.zoom,
+    projection,
+    viewCenter: { longitude: viewState.longitude, latitude: viewState.latitude },
+    onClusterClick,
+  });
 
-  // Stable basemap instance so panning/zooming never tears down its tile cache.
-  const base = useMemo(() => basemapLayer() as unknown as Layer, []);
-  const layers: Layer[] = useMemo(() => [base, ...dataLayers], [base, dataLayers]);
+  const satelliteTrackLayers = useMemo((): Layer[] => {
+    if (!satEnabled || selected?.layerId !== "satellites") return [];
+    const norad = selected.properties.norad as number | undefined;
+    if (norad == null) return [];
+    const tle = satTles.find((t) => t.norad === norad);
+    if (!tle) return [];
+
+    const track = computeOrbitGroundTrack(tle.line1, tle.line2);
+    if (!track) return [];
+
+    const isGlobe = projection === "globe";
+
+    const makePathLayer = (
+      id: string,
+      segments: [number, number][][] | [number, number, number][][],
+      alpha: number,
+      width: number,
+    ): Layer | null => {
+      const data = segments.filter((path) => path.length >= 2).map((path, i) => ({ path, i }));
+      if (!data.length) return null;
+      return new PathLayer({
+        id,
+        data,
+        pickable: false,
+        widthUnits: "pixels",
+        getPath: (d: { path: [number, number][] | [number, number, number][] }) => d.path,
+        getColor: [RGB.friendly[0], RGB.friendly[1], RGB.friendly[2], alpha],
+        getWidth: width,
+        capRounded: true,
+        jointRounded: true,
+        parameters: { depthCompare: "always" },
+        updateTriggers: {
+          getPath: [norad, satPositions.length, isGlobe],
+        },
+      });
+    };
+
+    return [
+      makePathLayer(
+        "satellite-ground-track-past",
+        orbitTrackPathsForProjection(track.past, isGlobe),
+        75,
+        1.5,
+      ),
+      makePathLayer(
+        "satellite-ground-track-future",
+        orbitTrackPathsForProjection(track.future, isGlobe),
+        170,
+        2,
+      ),
+    ].filter((l): l is Layer => l != null);
+  }, [satEnabled, selected, satTles, satPositions.length, projection]);
+
+  // Rebuild when basemap style changes so tile URL / tint update.
+  const base = useMemo(
+    () => basemapLayer(basemapStyle, projection === "globe") as unknown as Layer,
+    [basemapStyle, projection],
+  );
+  const layers: Layer[] = useMemo(
+    () => [base, ...dataLayers, ...satelliteTrackLayers],
+    [base, dataLayers, satelliteTrackLayers],
+  );
 
   // Distinct view ids per projection: when the id stays the same, deck.gl reuses
   // the existing controller instance, so switching MapView -> GlobeView left a
@@ -114,7 +184,12 @@ export default function MapCanvas() {
   const view = useMemo(
     () =>
       projection === "globe"
-        ? new GlobeView({ id: "globe" })
+        ? new GlobeView({
+            id: "globe",
+            // GlobeView defaults to cullMode:back, which culls billboard IconLayer quads
+            // on the near hemisphere (deck.gl#9777). TextLayer/Scatterplot are unaffected.
+            parameters: { cullMode: "none" },
+          })
         : new MapView({ id: "map", repeat: true }),
     [projection],
   );

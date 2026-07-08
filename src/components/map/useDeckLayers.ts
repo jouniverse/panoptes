@@ -12,14 +12,26 @@ import { getMarkerAtlas } from "./markers";
 import { clusterPoints, clusterExpansionZoom, getClusterLeafIndices, CLUSTER_THRESHOLD } from "./clustering";
 import { pmtilesLayer } from "./pmtiles";
 import { markerColorFor, toneToColor } from "@/config/marker-style";
+import type { Projection } from "@/core/state/store";
+import { entityPosition, globeLabelPosition, lonLatPosition } from "@/lib/entity-position";
+import { isGlobePointVisible } from "@/lib/globe-visibility";
+import { globeIconLayerProps, globeTextLayerProps, isGlobeProjection } from "./globe-layer-props";
 
 interface BuildArgs {
   data: Record<string, LayerData>;
   zoom: number;
+  projection: Projection;
+  viewCenter: { longitude: number; latitude: number };
   onClusterClick: (lon: number, lat: number, zoom: number) => void;
 }
 
-export function useDeckLayers({ data, zoom, onClusterClick }: BuildArgs): Layer[] {
+export function useDeckLayers({
+  data,
+  zoom,
+  projection,
+  viewCenter,
+  onClusterClick,
+}: BuildArgs): Layer[] {
   const enabled = useStore((s) => s.enabled);
   const intelFilter = useStore((s) => s.intelFilter);
   const selectedId = useStore((s) => s.selected?.id);
@@ -34,6 +46,7 @@ export function useDeckLayers({ data, zoom, onClusterClick }: BuildArgs): Layer[
   // Quantize zoom so clustering/layer rebuilds happen on meaningful steps, not
   // on every sub-pixel wheel delta (perf).
   const zoomBucket = Math.round(zoom * 2) / 2;
+  const isGlobe = isGlobeProjection(projection);
 
   return useMemo(() => {
     const atlas = typeof document !== "undefined" ? getMarkerAtlas() : null;
@@ -76,13 +89,37 @@ export function useDeckLayers({ data, zoom, onClusterClick }: BuildArgs): Layer[
           }
         }
         layers.push(
-          ...buildPointLayers(def, entities, zoom, atlas, selectedId, select, hover, onClusterClick),
+          ...buildPointLayers(
+            def,
+            entities,
+            zoom,
+            atlas,
+            selectedId,
+            select,
+            hover,
+            onClusterClick,
+            isGlobe,
+            viewCenter,
+          ),
         );
       }
     }
     return layers;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, enabled, intelFilter, zoomBucket, selectedId, tlEnabled, tlLo, tlHi, eqWindowDays]);
+  }, [
+    data,
+    enabled,
+    intelFilter,
+    zoomBucket,
+    selectedId,
+    tlEnabled,
+    tlLo,
+    tlHi,
+    eqWindowDays,
+    isGlobe,
+    viewCenter.longitude,
+    viewCenter.latitude,
+  ]);
 }
 
 function buildVectorLayer(
@@ -120,13 +157,19 @@ function buildPointLayers(
   select: (e: GeoEntity | null) => void,
   hover: (e: GeoEntity | null, screen?: { x: number; y: number } | null) => void,
   onClusterClick: (lon: number, lat: number, zoom: number) => void,
+  isGlobe: boolean,
+  viewCenter: { longitude: number; latitude: number },
 ): Layer[] {
   const color = hexToRgba(def.color);
-  const shouldCluster = entities.length > CLUSTER_THRESHOLD;
+  // Satellites at orbital altitude: surface cluster bubbles misalign with icons on globe.
+  const shouldCluster =
+    entities.length > CLUSTER_THRESHOLD && !(isGlobe && def.id === "satellites");
   const out: Layer[] = [];
 
   if (!shouldCluster) {
-    out.push(markerLayer(def, entities, color, atlas, selectedId, select, hover));
+    out.push(
+      markerLayer(def, entities, color, atlas, selectedId, select, hover, isGlobe, viewCenter),
+    );
     return out;
   }
 
@@ -160,7 +203,7 @@ function buildPointLayers(
       stroked: true,
       filled: true,
       radiusUnits: "pixels",
-      getPosition: (d: { lon: number; lat: number }) => [d.lon, d.lat],
+      getPosition: (d: { lon: number; lat: number }) => lonLatPosition(d.lon, d.lat, isGlobe),
       getRadius: (d: { count?: number }) => 10 + Math.min(18, Math.log2((d.count ?? 2) + 1) * 3),
       getFillColor: (d: { clusterId?: number }) => {
         const tc = d.clusterId != null ? clusterToneMap.get(d.clusterId) : undefined;
@@ -188,19 +231,21 @@ function buildPointLayers(
       id: `cluster-count-${def.id}`,
       data: clusters,
       pickable: false,
-      getPosition: (d: { lon: number; lat: number }) => [d.lon, d.lat],
+      getPosition: (d: { lon: number; lat: number }) => globeLabelPosition(d.lon, d.lat, isGlobe),
       getText: (d: { count?: number }) => String(d.count ?? ""),
       getSize: 11,
       fontFamily: "JetBrains Mono, monospace",
-      getColor: RGB.onSurface,
+      getColor: isGlobe ? [235, 240, 245, 255] : RGB.onSurface,
+      outlineWidth: isGlobe ? 2 : 0,
+      outlineColor: [0, 0, 0, 255],
       getTextAnchor: "middle",
       getAlignmentBaseline: "center",
-      // Billboards are otherwise depth-occluded by the globe sphere (invisible
-      // numbers in GlobeView); draw them on top (luma v9: depth test always passes).
-      parameters: { depthCompare: "always" },
+      ...globeTextLayerProps(isGlobe),
     }),
   );
-  out.push(markerLayer(def, leaves, color, atlas, selectedId, select, hover));
+  out.push(
+    markerLayer(def, leaves, color, atlas, selectedId, select, hover, isGlobe, viewCenter),
+  );
   return out;
 }
 
@@ -212,18 +257,27 @@ function markerLayer(
   selectedId: string | undefined,
   select: (e: GeoEntity | null) => void,
   hover: (e: GeoEntity | null, screen?: { x: number; y: number } | null) => void,
+  isGlobe: boolean,
+  viewCenter: { longitude: number; latitude: number },
 ): Layer {
+  const visibleEntities =
+    isGlobe && entities.length
+      ? entities.filter((e) =>
+          isGlobePointVisible(e.lon, e.lat, viewCenter.longitude, viewCenter.latitude),
+        )
+      : entities;
+
   // Optional per-entity colour (age, active/inactive, …); falls back to the
   // layer's flat colour when no resolver is registered for this layer.
   const colorFn = markerColorFor(def.id);
   return new IconLayer<GeoEntity>({
     id: `layer-${def.id}`,
-    data: entities,
+    data: visibleEntities,
     pickable: true,
     iconAtlas: atlas.atlas as unknown as string,
     iconMapping: atlas.mapping as never,
     getIcon: () => def.marker,
-    getPosition: (d) => [d.lon, d.lat],
+    getPosition: (d) => entityPosition(d, isGlobe),
     getSize: (d) =>
       (d.id === selectedId ? 26 : 18) *
       (1 + (d.severity ?? 0) * 0.6) *
@@ -251,13 +305,12 @@ function markerLayer(
         info.object ? { x: info.x, y: info.y } : null,
       );
     },
-    // Without this, icon billboards are hidden behind the globe sphere in
-    // GlobeView (markers invisible). depthCompare "always" draws them on top;
-    // far-side markers also show through — an acceptable trade-off for visibility.
-    parameters: { depthCompare: "always" },
+    ...globeIconLayerProps(isGlobe),
     updateTriggers: {
       getSize: [selectedId],
       getColor: [selectedId],
+      getPosition: [isGlobe],
+      data: [viewCenter.longitude, viewCenter.latitude, isGlobe],
     },
   });
 }

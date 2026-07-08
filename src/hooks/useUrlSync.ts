@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { LAYERS } from "@/config/layer-registry";
-import { useStore, type Projection } from "@/core/state/store";
+import { useStore, type BasemapStyle, type Projection } from "@/core/state/store";
 
 /**
  * Two-way sync of camera + projection + enabled layers with the URL query
@@ -32,6 +32,11 @@ export function useUrlSync() {
     const proj = p.get("proj");
     if (proj === "globe" || proj === "flat") s.setProjection(proj as Projection);
 
+    const basemap = p.get("basemap");
+    if (basemap === "strategic" || basemap === "satellite") {
+      s.setBasemapStyle(basemap as BasemapStyle);
+    }
+
     const layers = p.get("layers");
     if (layers != null) {
       const on = new Set(layers.split(",").filter(Boolean));
@@ -42,6 +47,7 @@ export function useUrlSync() {
   // persist to URL (debounced)
   const view = useStore((s) => s.viewState);
   const projection = useStore((s) => s.projection);
+  const basemapStyle = useStore((s) => s.basemapStyle);
   const enabled = useStore((s) => s.enabled);
 
   useEffect(() => {
@@ -51,6 +57,7 @@ export function useUrlSync() {
       p.set("lon", view.longitude.toFixed(4));
       p.set("z", view.zoom.toFixed(2));
       p.set("proj", projection);
+      if (basemapStyle !== "strategic") p.set("basemap", basemapStyle);
       p.set(
         "layers",
         LAYERS.filter((l) => enabled[l.id]).map((l) => l.id).join(","),
@@ -59,5 +66,5 @@ export function useUrlSync() {
       window.history.replaceState(null, "", url);
     }, 400);
     return () => clearTimeout(t);
-  }, [view, projection, enabled]);
+  }, [view, projection, basemapStyle, enabled]);
 }

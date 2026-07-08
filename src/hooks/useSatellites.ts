@@ -11,6 +11,13 @@ export interface SatPos {
   norad?: number;
 }
 
+export interface SatTle {
+  name: string;
+  line1: string;
+  line2: string;
+  norad?: number;
+}
+
 interface TlePayload {
   tles?: { name: string; line1: string; line2: string; norad?: number }[];
 }
@@ -60,12 +67,14 @@ async function loadTleGroup(group: string): Promise<{ tles: TlePayload["tles"]; 
  */
 export function useSatellites(group = "stations", enabled = true) {
   const [positions, setPositions] = useState<SatPos[]>([]);
+  const [tles, setTles] = useState<SatTle[]>([]);
   const [health, setHealth] = useState<FeedHealth>("idle");
   const workerRef = useRef<Worker | null>(null);
 
   useEffect(() => {
     if (!enabled) {
       setPositions([]);
+      setTles([]);
       setHealth("idle");
       return;
     }
@@ -81,10 +90,11 @@ export function useSatellites(group = "stations", enabled = true) {
 
     setHealth("idle");
     loadTleGroup(group)
-      .then(({ tles, health: h }) => {
+      .then(({ tles: loaded, health: h }) => {
         if (cancelled) return;
         setHealth(h);
-        worker.postMessage({ type: "init", tles: tles ?? [], intervalMs: 30_000 });
+        setTles(loaded ?? []);
+        worker.postMessage({ type: "init", tles: loaded ?? [], intervalMs: 30_000 });
       })
       .catch(() => !cancelled && setHealth("stale"));
 
@@ -95,5 +105,5 @@ export function useSatellites(group = "stations", enabled = true) {
     };
   }, [group, enabled]);
 
-  return { positions, health };
+  return { positions, health, tles };
 }

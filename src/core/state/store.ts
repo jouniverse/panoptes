@@ -3,6 +3,7 @@ import { CATEGORY_ORDER, defaultLayerState } from "@/config/layer-registry";
 import type { FeedHealth, GeoEntity, IntelMode, LayerCategory } from "@/core/types";
 
 export type Projection = "flat" | "globe";
+export type BasemapStyle = "strategic" | "satellite";
 export type IntelFilter = IntelMode | "all";
 
 export interface ViewState {
@@ -30,12 +31,14 @@ interface LayersSlice {
 
 interface ViewSlice {
   projection: Projection;
+  basemapStyle: BasemapStyle;
   viewState: ViewState;
   leftOpen: boolean;
   rightOpen: boolean;
   /** left-rail category id -> collapsed? (true = collapsed) */
   collapsedCats: Record<string, boolean>;
   setProjection: (p: Projection) => void;
+  setBasemapStyle: (b: BasemapStyle) => void;
   setViewState: (v: ViewState) => void;
   toggleLeft: () => void;
   toggleRight: () => void;
@@ -104,11 +107,13 @@ export const useStore = create<AppStore>((set) => ({
 
   // ---- view
   projection: "flat",
+  basemapStyle: "strategic",
   viewState: DEFAULT_VIEW,
   leftOpen: true,
   rightOpen: false,
   collapsedCats: defaultCollapsedCats(),
   setProjection: (p) => set({ projection: p }),
+  setBasemapStyle: (b) => set({ basemapStyle: b }),
   setViewState: (v) => set({ viewState: v }),
   toggleLeft: () => set((s) => ({ leftOpen: !s.leftOpen })),
   toggleRight: () => set((s) => ({ rightOpen: !s.rightOpen })),
