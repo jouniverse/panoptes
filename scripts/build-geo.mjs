@@ -193,25 +193,82 @@ const tasks = {
 
   "military-bases.geojson"() {
     const fc = readJSON(join(SRC, "military-bases/all-military-bases.geojson"));
+    /** Per-record provenance tags in the merged static-data file → public labels. */
+    const sourceLabel = {
+      "us-military-bases.csv":
+        "US Base Project — FY2024 Base Structure Report (usbaseproject.com)",
+      "military-bases.geojson":
+        "OSINT Military Base Map (sites.google.com/view/osintmilitarymap)",
+    };
     const features = fc.features
       .filter((f) => f.geometry)
+      .map((f) => {
+        const p = f.properties ?? {};
+        const rawSource = p.source;
+        const source =
+          (rawSource && sourceLabel[rawSource]) ||
+          (typeof rawSource === "string" ? rawSource : undefined);
+        return {
+          type: "Feature",
+          geometry: f.geometry,
+          // Keep the descriptive fields so the right panel is useful (operator,
+          // host country/region, service component, nearest city, description).
+          properties: pick(
+            {
+              ...p,
+              source,
+            },
+            [
+              "name",
+              "operator_country",
+              "location_country",
+              "location_region",
+              "service_component",
+              "nearest_city",
+              "description",
+              "source",
+            ],
+          ),
+        };
+      });
+    write("military-bases.geojson", features);
+  },
+
+  "missile-silos.geojson"() {
+    const fc = readJSON(join(SRC, "nuclear-missile/missile-sites.geojson"));
+    const features = fc.features
+      .filter((f) => f.geometry?.type === "Point")
       .map((f) => ({
         type: "Feature",
         geometry: f.geometry,
-        // Keep the descriptive fields so the right panel is useful (operator,
-        // host country/region, service component, nearest city, description).
         properties: pick(f.properties, [
           "name",
-          "operator_country",
-          "location_country",
-          "location_region",
-          "service_component",
-          "nearest_city",
-          "description",
-          "source",
+          "country",
+          "missile",
+          "startyear",
+          "stopyear",
+          "notes",
         ]),
       }));
-    write("military-bases.geojson", features);
+    write("missile-silos.geojson", features);
+  },
+
+  "nuclear-test-sites.geojson"() {
+    const fc = readJSON(join(SRC, "nuclear-missile/nuclear-bomb-test-sites.geojson"));
+    const features = fc.features
+      .filter((f) => f.geometry?.type === "Point")
+      .map((f) => ({
+        type: "Feature",
+        geometry: f.geometry,
+        properties: pick(f.properties, [
+          "Site name",
+          "Site location",
+          "Country",
+          "label",
+          "Notes",
+        ]),
+      }));
+    write("nuclear-test-sites.geojson", features);
   },
 
   "launch-sites.geojson"() {
@@ -1154,7 +1211,7 @@ const tasks = {
       join(SRC, "power-plants/global-power-plants-database.geojson"),
     );
     const features = fc.features
-      .filter((f) => f.geometry && (f.properties.capacity_mw ?? 0) >= 100)
+      .filter((f) => f.geometry && (f.properties.capacity_mw ?? 0) >= 20)
       .map((f) => ({
         type: "Feature",
         geometry: f.geometry,

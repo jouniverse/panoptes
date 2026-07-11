@@ -38,28 +38,40 @@ async function fetchLayer(layer: LayerDefinition): Promise<LayerData> {
 /** Loads data for every enabled, fetchable (static|api) layer and reports
  *  counts + feed health into the store. PMTiles layers are handled by the
  *  MVT renderer and skipped here. */
-export function useLayerData(): Record<string, LayerData> {
-  const enabled = useStore((s) => s.enabled);
+export function useLayerData(opts?: {
+  enabled?: Record<string, boolean>;
+  layerIds?: readonly string[];
+  reportToStore?: boolean;
+}): Record<string, LayerData> {
+  const storeEnabled = useStore((s) => s.enabled);
   const setHealth = useStore((s) => s.setHealth);
   const setCount = useStore((s) => s.setCount);
+
+  const enabled = opts?.enabled ?? storeEnabled;
+  const reportToStore = opts?.reportToStore ?? true;
+  const layerIdsKey = opts?.layerIds?.join(",") ?? "";
+  const idSet = useMemo(
+    () => (opts?.layerIds ? new Set(opts.layerIds) : null),
+    [layerIdsKey],
+  );
 
   const active = useMemo(
     () =>
       LAYERS.filter(
         (l) =>
           enabled[l.id] &&
+          (!idSet || idSet.has(l.id)) &&
           !l.placeholder &&
           l.source.kind !== "pmtiles" &&
           l.source.kind !== "worker",
       ),
-    [enabled],
+    [enabled, idSet],
   );
 
   const results = useQueries({
     queries: active.map((layer) => ({
-      queryKey: ["layer", layer.id],
+      queryKey: reportToStore ? ["layer", layer.id] : ["tools-layer", layer.id],
       queryFn: () => fetchLayer(layer),
-      // realtime layers refetch on cadence; static effectively never
       refetchInterval: cadenceMs(layer.source.cadence),
       staleTime: cadenceMs(layer.source.cadence) ?? Infinity,
     })),
@@ -67,6 +79,7 @@ export function useLayerData(): Record<string, LayerData> {
 
   // Report health + counts as a side effect (not during render).
   useEffect(() => {
+    if (!reportToStore) return;
     active.forEach((layer, i) => {
       const r = results[i];
       if (r.isSuccess) {

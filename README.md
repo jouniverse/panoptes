@@ -12,7 +12,15 @@ npm run geo:build      # normalize curated datasets -> public/geo (needs static-
 npm run dev            # http://localhost:3000
 ```
 
-The app runs **without any API keys** — USGS, GDELT, ReliefWeb, adsb.lol, World Bank, CelesTrak, NGA and the RSS feeds need none. Keys only unlock extra realtime feeds (vessels, fires, outages). Copy `.env.example` to `.env.local` to add them (the legacy `src/.env` is also auto-loaded server-side).
+The app runs **without any API keys** — USGS, GDELT, ReliefWeb, adsb.lol, World Bank, CelesTrak, NGA and the RSS feeds need none. Keys only unlock extra realtime feeds (vessels, fires, outages). Put them in **`src/.env`** (git-ignored). Optional `.env.local` at repo root also works.
+
+**Maritime AIS (live):** requires a local relay in a second terminal:
+
+```bash
+# src/.env needs AIS_STREAM_KEY from https://aisstream.io
+npm run ais:relay    # WebSocket relay on :8787
+npm run dev          # then enable Maritime AIS on Geospatial or open Ops
+```
 
 ## Sections
 
@@ -46,6 +54,7 @@ The app runs **without any API keys** — USGS, GDELT, ReliefWeb, adsb.lol, Worl
 | `npm run typecheck` / `lint` | TS + ESLint |
 | `npm run geo:build` | Build Tier A GeoJSON + centroids + indicators from `static-data/` |
 | `npm run geo:tiles` | Build Tier B PMTiles (uses tippecanoe or GDAL `ogr2ogr`) |
+| `npm run ais:relay` | Local AISStream WebSocket relay for Maritime AIS layer |
 
 ## Data dump
 
@@ -72,4 +81,4 @@ Each layer carries its source + license in the registry and is shown in-app. Not
 
 Delivered: HUD shell, map engine (flat + globe), 17 curated/live layers, clustering, tactical markers, detail cards, dual-mode anti-clutter, timeline playback, analytics choropleths + profiles + CSV, ops realtime + source health, nuclear/missile tools + SITREP, tiling pipeline, cached proxies with circuit breakers, CI + scheduled refresh.
 
-Deferred / next: render Tier B PMTiles on the globe (currently flat-only), heatmap aggregation for very dense layers, persisted Redis cache, AIS as a long-lived relay (vs sampled), per-feed attribution drawer, and the optional AI summarization layer (intentionally out of v1).
+Deferred / next: render Tier B PMTiles on the globe (currently flat-only), heatmap aggregation for very dense layers, persisted Redis cache, production AIS relay deployment (local sidecar ships today), per-feed attribution drawer, and the optional AI summarization layer (intentionally out of v1).

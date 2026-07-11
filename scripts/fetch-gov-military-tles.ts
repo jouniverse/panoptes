@@ -1,7 +1,8 @@
 #!/usr/bin/env npx tsx
 /**
  * Prefetch UCS government+military TLEs (Space-Track primary) into public/data/.
- * Run daily: npm run tles:fetch
+ * Run manually: npm run tles:fetch
+ * Auto (local dev): npm predev refreshes when cache is older than 24h.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

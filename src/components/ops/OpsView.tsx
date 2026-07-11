@@ -2,6 +2,7 @@
 
 import { useOpsFeed } from "@/hooks/useOpsFeed";
 import { useSatellites } from "@/hooks/useSatellites";
+import { useVessels } from "@/hooks/useVessels";
 import type { FeedHealth } from "@/core/types";
 import { pickFeatures } from "./ops-utils";
 import { OpsMapPanel } from "./OpsMapPanel";
@@ -35,6 +36,7 @@ export function OpsView() {
   const eia = useOpsFeed("eia", "/api/ops/eia", (j) => [j], 24 * 60 * 60_000);
   const trade = useOpsFeed("trade", "/api/ops/trade", (j) => [j], 24 * 60 * 60_000);
   const sats = useSatellites("gov-military");
+  const ais = useVessels({ enabled: true });
 
   const spaceNewsPayload = spaceNews.items[0] as { news?: unknown[]; launches?: unknown[] } | undefined;
 
@@ -50,7 +52,7 @@ export function OpsView() {
     { name: "MARKETS (Yahoo)", health: "live" as FeedHealth, count: 0 },
     { name: "EIA (oil & energy)", health: eia.health, count: (eia.items[0] as { series?: unknown[] })?.series?.length ?? 0 },
     { name: "TRADE INDICATORS", health: trade.health, count: trade.items.length && !(trade.items[0] as { error?: string })?.error ? 1 : 0 },
-    { name: "AIS VESSELS (deferred)", health: "idle" as FeedHealth, count: 0 },
+    { name: "AIS VESSELS (AISStream)", health: ais.health, count: ais.count },
   ];
 
   return (
@@ -60,7 +62,7 @@ export function OpsView() {
         <OpsDetailsPanel />
         <OpsAviationPanel features={flights.items} health={flights.health} />
         <OpsAviationNewsPanel items={aviationNews.items as never[]} health={aviationNews.health} />
-        <OpsMaritimeAisPanel />
+        <OpsMaritimeAisPanel vessels={ais.rawVessels} health={ais.health} />
         <OpsMaritimeAlertsPanel features={alerts.items} health={alerts.health} />
         <OpsNavalNewsPanel items={navalNews.items as never[]} health={navalNews.health} />
         <OpsSpaceOrbitalPanel positions={sats.positions} health={sats.health as FeedHealth} />

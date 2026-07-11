@@ -1,5 +1,6 @@
 import type { GeoEntity } from "@/core/types";
 import { hexToRgba, PALETTE, type RGBA } from "./theme";
+import { MARKER_HUES } from "./marker-palette";
 
 /**
  * Per-layer dynamic marker styling, driven by entity properties.
@@ -43,12 +44,12 @@ function launchSiteColor(e: GeoEntity): RGBA {
     : hexToRgba(PALETTE.outline, 150); // decommissioned — muted grey
 }
 
-/** Closed military airfields — muted; operational bases keep layer gold. */
+/** Closed military airfields — muted; operational bases keep layer airfieldGold. */
 function militaryAirportColor(e: GeoEntity): RGBA {
   const t = String(e.properties.type ?? "").toLowerCase();
   return t === "closed"
     ? hexToRgba(PALETTE.outline, 150)
-    : hexToRgba(PALETTE.gold, 235);
+    : hexToRgba(MARKER_HUES.airfieldGold, 235);
 }
 
 /**
@@ -107,14 +108,14 @@ function maritimeAlertColor(e: GeoEntity): RGBA {
   return hexToRgba(PALETTE.alert, 235);
 }
 
-/** COW MIDLOC: disputes (MIDLOCA) vs incidents (MIDLOCI). */
+/** COW MIDLOC: disputes (MIDLOCA) vs incidents (MIDLOCI). Violet disputes avoid clashing with Military Bases (gold triangle). */
 function historicalConflictColor(e: GeoEntity): RGBA {
   const rt = String(e.properties.record_type ?? "");
   const ds = String(e.properties.source_dataset ?? "");
   const incident = rt === "incident" || ds.includes("MIDLOCI");
   return incident
     ? hexToRgba(PALETTE.alert, 220) // violent incidents — red
-    : hexToRgba(PALETTE.gold, 220); // interstate disputes — gold
+    : hexToRgba(MARKER_HUES.violet, 220); // interstate disputes — violet
 }
 
 const POWER_FUEL_COLORS: Partial<Record<string, RGBA>> = {
@@ -131,7 +132,13 @@ const POWER_FUEL_COLORS: Partial<Record<string, RGBA>> = {
 
 function powerPlantColor(e: GeoEntity): RGBA {
   const fuel = e.properties.primary_fuel as string;
-  return POWER_FUEL_COLORS[fuel] ?? hexToRgba(PALETTE.outline, 180);
+  return POWER_FUEL_COLORS[fuel] ?? hexToRgba(MARKER_HUES.amber, 200);
+}
+
+function maritimeAisColor(e: GeoEntity): RGBA {
+  const cat = String(e.properties.ais_category ?? "");
+  if (cat === "military") return hexToRgba(MARKER_HUES.gold, 235);
+  return hexToRgba(MARKER_HUES.intel, 220);
 }
 
 export const MARKER_COLORS: Record<string, MarkerColorFn> = {
@@ -142,6 +149,7 @@ export const MARKER_COLORS: Record<string, MarkerColorFn> = {
   "maritime-alerts": maritimeAlertColor,
   "power-plants": powerPlantColor,
   "historical-conflicts": historicalConflictColor,
+  "maritime-ais": maritimeAisColor,
 };
 
 export function markerColorFor(layerId: string): MarkerColorFn | undefined {

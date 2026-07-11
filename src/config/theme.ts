@@ -36,3 +36,5 @@ export const RGB = {
   onSurface: hexToRgba(PALETTE.onSurface),
   outline: hexToRgba(PALETTE.outline),
 } as const;
+
+export { MARKER_HUES, markerHueDistance, resolveMarkerHue } from "./marker-palette";

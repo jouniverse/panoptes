@@ -12,6 +12,14 @@ export const FIELD_MAPS: Record<string, EntityFieldMap> = {
   "country-borders": { label: ["NAME", "ADMIN", "name"] },
   "populated-places": { label: ["NAME", "name", "nameascii"] },
   "military-bases": { label: ["name", "label", "nearest_city"], tier: confirmed },
+  "missile-silos": {
+    label: ["name"],
+    tier: confirmed,
+  },
+  "nuclear-test-sites": {
+    label: ["Site name", "label", "Site location"],
+    tier: confirmed,
+  },
   "launch-sites": { label: ["Location", "label", "name"], tier: confirmed },
   "major-ports": { label: ["PORT_NAME", "label"], tier: confirmed },
   "maritime-alerts": {
@@ -77,6 +85,11 @@ export const FIELD_MAPS: Record<string, EntityFieldMap> = {
   disasters: { label: ["name", "label", "title"], tier: confirmed },
   "military-flights": {
     label: ["callsign", "label", "registration", "description"],
+    tier: confirmed,
+    timestamp: (p) => (typeof p.time === "number" ? p.time : undefined),
+  },
+  "maritime-ais": {
+    label: ["name", "label", "watchlistName"],
     tier: confirmed,
     timestamp: (p) => (typeof p.time === "number" ? p.time : undefined),
   },

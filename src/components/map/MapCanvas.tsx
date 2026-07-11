@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import DeckGL from "@deck.gl/react";
 import { PathLayer } from "@deck.gl/layers";
 import {
@@ -15,6 +15,7 @@ import { useStore, type ViewState } from "@/core/state/store";
 import { useLayerData } from "@/hooks/useLayerData";
 import { useUrlSync } from "@/hooks/useUrlSync";
 import { useSatellites } from "@/hooks/useSatellites";
+import { useVessels } from "@/hooks/useVessels";
 import { basemapLayer } from "./basemap";
 import { useDeckLayers } from "./useDeckLayers";
 import type { GeoEntity, FeedHealth } from "@/core/types";
@@ -24,6 +25,18 @@ import { RGB } from "@/config/theme";
 import satMeta from "@/data/military-satellites-meta.json";
 
 const EMPTY_FC: FeatureCollection = { type: "FeatureCollection", features: [] };
+
+/** Rough map viewport bbox from deck view state (for AIS culling). */
+function viewportBbox(vs: ViewState) {
+  const latSpan = 180 / 2 ** vs.zoom;
+  const lonSpan = 360 / 2 ** vs.zoom;
+  return {
+    west: vs.longitude - lonSpan / 2,
+    east: vs.longitude + lonSpan / 2,
+    south: Math.max(-85, vs.latitude - latSpan / 2),
+    north: Math.min(85, vs.latitude + latSpan / 2),
+  };
+}
 
 /** UCS attributes per NORAD id (country/operator/users/purpose/detail/orbit). */
 const SAT_META = satMeta as Record<
@@ -52,51 +65,80 @@ export default function MapCanvas() {
     satEnabled,
   );
 
+  const aisEnabled = !!enabled["maritime-ais"];
+  const aisViewport = useMemo(() => viewportBbox(viewState), [viewState]);
+  const { vessels: aisVessels, health: aisHealthRaw } = useVessels({
+    enabled: aisEnabled,
+    viewport: aisViewport,
+  });
+
   const baseData = useLayerData();
 
   // Merge satellite positions into the standard LayerData map so useDeckLayers
   // can render them through the normal point-layer pipeline.
   const data = useMemo((): Record<string, LayerData> => {
-    if (!satEnabled || satPositions.length === 0) return baseData;
-    const satEntities: GeoEntity[] = satPositions.map((p) => {
-      const meta = p.norad != null ? SAT_META[String(p.norad)] : undefined;
-      return {
-        id: `sat-${p.name.replace(/\s+/g, "_")}`,
-        layerId: "satellites",
-        lon: p.lon,
-        lat: p.lat,
-        label: p.name,
-        properties: {
-          name: p.name,
-          altitude_km: Math.round(p.alt),
-          norad: p.norad,
-          // UCS attributes, abbreviated keys per user preference.
-          country: meta?.country,
-          operator: meta?.operator,
-          users: meta?.users,
-          purpose: meta?.purpose,
-          detail: meta?.detail,
-          orbit: meta?.orbit,
+    let merged = baseData;
+
+    if (satEnabled && satPositions.length > 0) {
+      const satEntities: GeoEntity[] = satPositions.map((p) => {
+        const meta = p.norad != null ? SAT_META[String(p.norad)] : undefined;
+        return {
+          id: `sat-${p.name.replace(/\s+/g, "_")}`,
+          layerId: "satellites",
+          lon: p.lon,
+          lat: p.lat,
+          label: p.name,
+          properties: {
+            name: p.name,
+            altitude_km: Math.round(p.alt),
+            norad: p.norad,
+            country: meta?.country,
+            operator: meta?.operator,
+            users: meta?.users,
+            purpose: meta?.purpose,
+            detail: meta?.detail,
+            orbit: meta?.orbit,
+          },
+        };
+      });
+      merged = {
+        ...merged,
+        satellites: {
+          entities: satEntities,
+          raw: EMPTY_FC,
+          health: satHealthRaw as FeedHealth,
         },
       };
-    });
-    return {
-      ...baseData,
-      satellites: {
-        entities: satEntities,
-        raw: EMPTY_FC,
-        health: satHealthRaw as FeedHealth,
-      },
-    };
-  }, [baseData, satEnabled, satPositions, satHealthRaw]);
+    }
+
+    if (aisEnabled && aisVessels.length > 0) {
+      merged = {
+        ...merged,
+        "maritime-ais": {
+          entities: aisVessels,
+          raw: EMPTY_FC,
+          health: aisHealthRaw,
+        },
+      };
+    }
+
+    return merged;
+  }, [baseData, satEnabled, satPositions, satHealthRaw, aisEnabled, aisVessels, aisHealthRaw]);
 
   // Report satellite health + count into the store (mirrors what useLayerData
-  // does for GeoJSON layers).
-  useMemo(() => {
+  // does for GeoJSON layers). Must run in useEffect — setState during render
+  // triggers "Cannot update BottomBar while rendering MapCanvas".
+  useEffect(() => {
     if (!satEnabled) return;
     setHealth("satellites", satHealthRaw as FeedHealth);
     setCount("satellites", satPositions.length);
   }, [satEnabled, satHealthRaw, satPositions.length, setHealth, setCount]);
+
+  useEffect(() => {
+    if (!aisEnabled) return;
+    setHealth("maritime-ais", aisHealthRaw);
+    setCount("maritime-ais", aisVessels.length);
+  }, [aisEnabled, aisHealthRaw, aisVessels.length, setHealth, setCount]);
 
   const onClusterClick = useCallback(
     (lon: number, lat: number, zoom: number) => {

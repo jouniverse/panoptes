@@ -13,7 +13,10 @@
     "geo:build": "node scripts/build-geo.mjs",
     "geo:tiles": "node scripts/build-tiles.mjs",
     "analytics:cache": "node scripts/fetch-analytics-cache.mjs",
-    "tles:fetch": "npx tsx scripts/fetch-gov-military-tles.ts"
+    "tles:fetch": "npx tsx scripts/fetch-gov-military-tles.ts",
+    "predev": "node scripts/ensure-fresh-tles.mjs",
+    "markers:validate": "node scripts/validate-markers.mjs",
+    "ais:relay": "node scripts/ais-relay/index.mjs"
   },
   "dependencies": {
     "@deck.gl/aggregation-layers": "^9.3.4",
@@ -49,6 +52,7 @@
     "eslint": "^9.0.0",
     "eslint-config-next": "^15.5.19",
     "tailwindcss": "^4.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "ws": "^8.21.0"
   }
 }

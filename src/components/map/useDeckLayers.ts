@@ -12,7 +12,7 @@ import { getMarkerAtlas } from "./markers";
 import { clusterPoints, clusterExpansionZoom, getClusterLeafIndices, CLUSTER_THRESHOLD } from "./clustering";
 import { pmtilesLayer } from "./pmtiles";
 import { markerColorFor, toneToColor } from "@/config/marker-style";
-import type { Projection } from "@/core/state/store";
+import type { Projection, IntelFilter } from "@/core/state/store";
 import { entityPosition, globeLabelPosition, lonLatPosition } from "@/lib/entity-position";
 import { isGlobePointVisible } from "@/lib/globe-visibility";
 import { globeIconLayerProps, globeTextLayerProps, isGlobeProjection } from "./globe-layer-props";
@@ -23,6 +23,13 @@ interface BuildArgs {
   projection: Projection;
   viewCenter: { longitude: number; latitude: number };
   onClusterClick: (lon: number, lat: number, zoom: number) => void;
+  /** Tools view: override global enabled / selection / intel filter. */
+  enabledOverride?: Record<string, boolean>;
+  layerIds?: readonly string[];
+  intelFilterOverride?: IntelFilter;
+  selectedIdOverride?: string;
+  onSelect?: (e: GeoEntity | null) => void;
+  onHover?: (e: GeoEntity | null, screen?: { x: number; y: number } | null) => void;
 }
 
 export function useDeckLayers({
@@ -31,14 +38,27 @@ export function useDeckLayers({
   projection,
   viewCenter,
   onClusterClick,
+  enabledOverride,
+  layerIds,
+  intelFilterOverride,
+  selectedIdOverride,
+  onSelect,
+  onHover,
 }: BuildArgs): Layer[] {
-  const enabled = useStore((s) => s.enabled);
-  const intelFilter = useStore((s) => s.intelFilter);
-  const selectedId = useStore((s) => s.selected?.id);
-  const select = useStore((s) => s.select);
-  const hover = useStore((s) => s.hover);
+  const storeEnabled = useStore((s) => s.enabled);
+  const storeIntelFilter = useStore((s) => s.intelFilter);
+  const storeSelectedId = useStore((s) => s.selected?.id);
+  const storeSelect = useStore((s) => s.select);
+  const storeHover = useStore((s) => s.hover);
   const timeline = useStore((s) => s.timeline);
   const eqWindowDays = useStore((s) => s.eqWindowDays);
+
+  const enabled = enabledOverride ?? storeEnabled;
+  const intelFilter = intelFilterOverride ?? storeIntelFilter;
+  const selectedId = selectedIdOverride ?? storeSelectedId;
+  const select = onSelect ?? storeSelect;
+  const hover = onHover ?? storeHover;
+  const layerIdSet = layerIds ? new Set(layerIds) : null;
 
   const tlEnabled = timeline.enabled;
   const tlLo = timeline.current - timeline.windowMs;
@@ -53,6 +73,7 @@ export function useDeckLayers({
     const layers: Layer[] = [];
 
     for (const def of LAYERS) {
+      if (layerIdSet && !layerIdSet.has(def.id)) continue;
       if (!enabled[def.id]) continue;
       if (intelFilter !== "all" && !layerInIntelMode(def, intelFilter)) continue;
       if (def.minZoom != null && zoom < def.minZoom) continue;
@@ -119,6 +140,12 @@ export function useDeckLayers({
     isGlobe,
     viewCenter.longitude,
     viewCenter.latitude,
+    enabledOverride,
+    layerIds,
+    intelFilterOverride,
+    selectedIdOverride,
+    onSelect,
+    onHover,
   ]);
 }
 

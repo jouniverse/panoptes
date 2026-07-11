@@ -1,44 +1,39 @@
 import type { Feature } from "geojson";
 import { serveGeo, feature } from "@/lib/provider";
+import { classifyVesselUpdate } from "@/lib/ais-classify";
 
 // Holds a short-lived WebSocket; needs the Node runtime + headroom.
 export const runtime = "nodejs";
 export const maxDuration = 15;
 
-// AISStream.io — global AIS vessel positions over WebSocket. The key is a
-// secret, so we sample server-side: open a WS, collect PositionReports for a
-// few seconds, then close and return a GeoJSON snapshot (cached 60s). This
-// keeps a stateful streaming source usable from cacheable route handlers.
+// AISStream.io — degraded snapshot when the local relay is unavailable.
 const KEY = process.env.AIS_STREAM_KEY;
 const SAMPLE_MS = 4500;
 const MAX_VESSELS = 1500;
 
-interface AisMsg {
-  MessageType?: string;
-  MetaData?: {
-    MMSI?: number;
-    ShipName?: string;
-    latitude?: number;
-    longitude?: number;
-    time_utc?: string;
-  };
-  Message?: {
-    PositionReport?: { Sog?: number; Cog?: number; TrueHeading?: number };
-  };
+async function loadParser() {
+  const mod = await import("../../../../scripts/ais-relay/aisParser.mjs");
+  return mod.normalizeAisMessage as (raw: unknown) => Record<string, unknown> | null;
 }
 
 async function sample(): Promise<Feature[]> {
   if (!KEY) throw new Error("AIS_STREAM_KEY not configured");
   if (typeof WebSocket === "undefined") throw new Error("WebSocket unavailable in runtime");
 
+  const normalizeAisMessage = await loadParser();
+
   return new Promise<Feature[]>((resolve, reject) => {
-    const seen = new Map<number, Feature>();
+    const seen = new Map<string, Feature>();
     let settled = false;
     const ws = new WebSocket("wss://stream.aisstream.io/v0/stream");
     const done = () => {
       if (settled) return;
       settled = true;
-      try { ws.close(); } catch { /* noop */ }
+      try {
+        ws.close();
+      } catch {
+        /* noop */
+      }
       resolve([...seen.values()]);
     };
     const timer = setTimeout(done, SAMPLE_MS);
@@ -46,38 +41,58 @@ async function sample(): Promise<Feature[]> {
     ws.onopen = () => {
       ws.send(
         JSON.stringify({
-          APIKey: KEY,
+          Apikey: KEY,
           BoundingBoxes: [[[-90, -180], [90, 180]]],
-          FilterMessageTypes: ["PositionReport"],
         }),
       );
     };
+
     ws.onmessage = (ev: MessageEvent) => {
       try {
         const data = typeof ev.data === "string" ? ev.data : "";
         if (!data) return;
-        const msg = JSON.parse(data) as AisMsg;
-        const m = msg.MetaData;
-        if (!m || m.latitude == null || m.longitude == null || m.MMSI == null) return;
-        const pr = msg.Message?.PositionReport;
+        const raw = JSON.parse(data) as unknown;
+        const normalized = normalizeAisMessage(raw);
+        if (!normalized) return;
+
+        const classified = classifyVesselUpdate({
+          ...normalized,
+          updatedAt: Date.now(),
+        });
+        if (!classified) return;
+
+        const heading =
+          classified.trueHeading != null && classified.trueHeading < 360
+            ? classified.trueHeading
+            : (classified.cog ?? 0);
+
         seen.set(
-          m.MMSI,
+          classified.mmsi,
           feature(
-            m.longitude,
-            m.latitude,
+            classified.lon,
+            classified.lat,
             {
-              label: (m.ShipName || `MMSI ${m.MMSI}`).trim(),
-              mmsi: m.MMSI,
-              sog_kt: pr?.Sog,
-              heading: pr?.TrueHeading ?? pr?.Cog ?? 0,
-              time: m.time_utc ? Date.parse(m.time_utc) : Date.now(),
+              label: (classified.watchlistName || classified.name || `MMSI ${classified.mmsi}`).trim(),
+              mmsi: classified.mmsi,
+              sog_kt: classified.sog,
+              cog: classified.cog,
+              heading,
+              ship_type: classified.shipType,
+              ais_category: classified.aisCategory,
+              time: Date.now(),
             },
-            m.MMSI,
+            classified.mmsi,
           ),
         );
-        if (seen.size >= MAX_VESSELS) { clearTimeout(timer); done(); }
-      } catch { /* ignore malformed frame */ }
+        if (seen.size >= MAX_VESSELS) {
+          clearTimeout(timer);
+          done();
+        }
+      } catch {
+        /* ignore malformed frame */
+      }
     };
+
     ws.onerror = () => {
       if (settled) return;
       settled = true;

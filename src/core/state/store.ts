@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { CATEGORY_ORDER, defaultLayerState } from "@/config/layer-registry";
+import { defaultToolsLayerState } from "@/config/tools-layers";
 import type { FeedHealth, GeoEntity, IntelMode, LayerCategory } from "@/core/types";
 
 export type Projection = "flat" | "globe";
@@ -27,6 +28,11 @@ interface LayersSlice {
   /** Client-side time window (days) for the Earthquakes layer: 1 or 7. */
   eqWindowDays: 1 | 7;
   setEqWindow: (d: 1 | 7) => void;
+  /** Maritime AIS category filters (MapLegend toggles). */
+  aisShowCargoTanker: boolean;
+  aisShowMilitary: boolean;
+  setAisShowCargoTanker: (on: boolean) => void;
+  setAisShowMilitary: (on: boolean) => void;
 }
 
 interface ViewSlice {
@@ -63,6 +69,17 @@ interface SelectionSlice {
   hover: (e: GeoEntity | null, screen?: { x: number; y: number } | null) => void;
 }
 
+interface ToolsLayersSlice {
+  toolsEnabled: Record<string, boolean>;
+  toolsSelected: GeoEntity | null;
+  toolsHovered: GeoEntity | null;
+  toolsHoverScreen: { x: number; y: number } | null;
+  toggleToolsLayer: (id: string) => void;
+  setToolsLayer: (id: string, on: boolean) => void;
+  selectToolsEntity: (e: GeoEntity | null) => void;
+  hoverToolsEntity: (e: GeoEntity | null, screen?: { x: number; y: number } | null) => void;
+}
+
 export interface TimelineState {
   enabled: boolean;
   playing: boolean;
@@ -80,7 +97,7 @@ interface TimelineSlice {
   setWindow: (ms: number) => void;
 }
 
-export type AppStore = LayersSlice & ViewSlice & SelectionSlice & TimelineSlice;
+export type AppStore = LayersSlice & ViewSlice & SelectionSlice & TimelineSlice & ToolsLayersSlice;
 
 export const DEFAULT_VIEW: ViewState = {
   longitude: 17.86,
@@ -104,6 +121,10 @@ export const useStore = create<AppStore>((set) => ({
   setIntelFilter: (f) => set({ intelFilter: f }),
   eqWindowDays: 1,
   setEqWindow: (d) => set({ eqWindowDays: d }),
+  aisShowCargoTanker: true,
+  aisShowMilitary: true,
+  setAisShowCargoTanker: (on) => set({ aisShowCargoTanker: on }),
+  setAisShowMilitary: (on) => set({ aisShowMilitary: on }),
 
   // ---- view
   projection: "flat",
@@ -127,6 +148,19 @@ export const useStore = create<AppStore>((set) => ({
   hoverScreen: null,
   select: (e) => set({ selected: e, rightOpen: e ? true : false }),
   hover: (e, screen = null) => set({ hovered: e, hoverScreen: screen ?? null }),
+
+  // ---- tools view layers (independent from Geospatial enabled/selected)
+  toolsEnabled: defaultToolsLayerState(),
+  toolsSelected: null,
+  toolsHovered: null,
+  toolsHoverScreen: null,
+  toggleToolsLayer: (id) =>
+    set((s) => ({ toolsEnabled: { ...s.toolsEnabled, [id]: !s.toolsEnabled[id] } })),
+  setToolsLayer: (id, on) =>
+    set((s) => ({ toolsEnabled: { ...s.toolsEnabled, [id]: on } })),
+  selectToolsEntity: (e) => set({ toolsSelected: e }),
+  hoverToolsEntity: (e, screen = null) =>
+    set({ toolsHovered: e, toolsHoverScreen: screen ?? null }),
 
   // ---- timeline
   timeline: {

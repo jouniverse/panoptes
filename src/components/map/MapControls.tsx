@@ -31,7 +31,7 @@ function Btn({
   );
 }
 
-export function MapControls() {
+export function MapControls({ showLayerToggle = true }: { showLayerToggle?: boolean }) {
   const projection = useStore((s) => s.projection);
   const setProjection = useStore((s) => s.setProjection);
   const basemapStyle = useStore((s) => s.basemapStyle);
@@ -46,10 +46,14 @@ export function MapControls() {
 
   return (
     <div className="absolute right-3 top-3 z-20 flex flex-col gap-1.5">
-      <Btn onClick={toggleLeft} active={leftOpen} title="Toggle layers">
-        ☰
-      </Btn>
-      <div className="h-px w-8 bg-[var(--color-outline-variant)]" />
+      {showLayerToggle && (
+        <>
+          <Btn onClick={toggleLeft} active={leftOpen} title="Toggle layers">
+            ☰
+          </Btn>
+          <div className="h-px w-8 bg-[var(--color-outline-variant)]" />
+        </>
+      )}
       <Btn
         onClick={() => setProjection("flat")}
         active={projection === "flat"}

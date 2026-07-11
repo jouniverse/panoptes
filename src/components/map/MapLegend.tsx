@@ -8,10 +8,16 @@ export function MapLegend() {
   const enabled = useStore((s) => s.enabled);
   const eqWindowDays = useStore((s) => s.eqWindowDays);
   const setEqWindow = useStore((s) => s.setEqWindow);
+  const aisShowCargoTanker = useStore((s) => s.aisShowCargoTanker);
+  const aisShowMilitary = useStore((s) => s.aisShowMilitary);
+  const setAisShowCargoTanker = useStore((s) => s.setAisShowCargoTanker);
+  const setAisShowMilitary = useStore((s) => s.setAisShowMilitary);
 
   const showTone = !!enabled["conflict-events"];
   const showEq = !!enabled["earthquakes"];
-  if (!showTone && !showEq) return null;
+  const showAis = !!enabled["maritime-ais"];
+
+  if (!showTone && !showEq && !showAis) return null;
 
   return (
     <div className="absolute left-3 top-3 z-20 flex max-w-[220px] flex-col gap-2">
@@ -34,6 +40,47 @@ export function MapLegend() {
                 {d === 1 ? "1 DAY" : "7 DAYS"}
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {showAis && (
+        <div className="pan-glass pan-notch-tr px-2.5 py-2">
+          <div className="label-caps text-[var(--color-outline)]">MARITIME AIS</div>
+          <div className="mt-1.5 flex flex-col gap-1">
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={aisShowCargoTanker}
+                onChange={(e) => setAisShowCargoTanker(e.target.checked)}
+                className="accent-[var(--color-intel)]"
+              />
+              <span className="font-mono text-[10px] text-[var(--color-on-surface)]">
+                Cargo &amp; Tankers
+              </span>
+              <span
+                className="ml-auto inline-block h-2 w-2 shrink-0"
+                style={{ background: "var(--color-intel)" }}
+              />
+            </label>
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={aisShowMilitary}
+                onChange={(e) => setAisShowMilitary(e.target.checked)}
+                className="accent-[var(--color-gold)]"
+              />
+              <span className="font-mono text-[10px] text-[var(--color-on-surface)]">
+                Military Vessels
+              </span>
+              <span
+                className="ml-auto inline-block h-2 w-2 shrink-0"
+                style={{ background: "var(--color-gold)" }}
+              />
+            </label>
+          </div>
+          <div className="mt-1.5 text-[9px] leading-tight text-[var(--color-on-surface-variant)]">
+            Terrestrial AIS — coastal ~200 km. Military AIS rarely transmitted.
           </div>
         </div>
       )}

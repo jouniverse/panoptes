@@ -5,6 +5,13 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { FeatureCollection } from "geojson";
 import type { LngLat, ToolMode } from "@/components/tools/ToolsMap";
+import { ToolsLayerPanel } from "@/components/tools/ToolsLayerPanel";
+import { ToolsHoverTooltip } from "@/components/tools/ToolsHoverTooltip";
+import { MapControls } from "@/components/map/MapControls";
+import { EntityAttributes } from "@/components/panels/EntityAttributes";
+import { LocationLinks } from "@/components/panels/LocationLinks";
+import { LAYERS_BY_ID } from "@/config/layer-registry";
+import { useStore } from "@/core/state/store";
 import { effectRings, estimateSeverelyAffected } from "@/lib/nuclear";
 import { haversineKm, bearingDeg, flightTimeMin } from "@/lib/ballistics";
 import { WEAPON_PRESETS, MISSILE_PRESETS } from "@/config/presets";
@@ -67,6 +74,10 @@ function useAssets() {
 }
 
 export function ToolsView() {
+  const basemapStyle = useStore((s) => s.basemapStyle);
+  const toolsSelected = useStore((s) => s.toolsSelected);
+  const selectToolsEntity = useStore((s) => s.selectToolsEntity);
+
   const [mode, setMode] = useState<ToolMode>("detonation");
   const [yieldKt, setYieldKt] = useState(300);
   const [burst, setBurst] = useState<"air" | "ground">("air");
@@ -276,10 +287,12 @@ export function ToolsView() {
             </TacticalButton>
           </div>
         )}
+
+        <ToolsLayerPanel />
       </aside>
 
       {/* map */}
-      <div className="relative min-w-0 flex-1">
+      <div className="pan-crosshair pan-frame relative min-w-0 flex-1">
         <ToolsMap
           mode={mode}
           yieldKt={yieldKt}
@@ -291,6 +304,13 @@ export function ToolsView() {
           missileRangeKm={missileRangeKm}
           onMapClick={onMapClick}
         />
+        <MapControls showLayerToggle={false} />
+        <ToolsHoverTooltip />
+        {basemapStyle === "satellite" && (
+          <div className="pointer-events-none absolute bottom-3 left-3 z-10 label-caps text-[9px] text-[var(--color-outline)]">
+            Esri World Imagery
+          </div>
+        )}
       </div>
 
       {/* readout */}
@@ -372,7 +392,40 @@ export function ToolsView() {
               )}
             </>
           )}
+
+          {toolsSelected && (
+            <div className="mt-3 border border-[var(--color-outline-variant)]">
+              <div className="flex items-center justify-between border-b border-[var(--color-outline-variant)] px-2 py-1">
+                <span className="label-caps text-[var(--color-outline)]">FEATURE DETAIL</span>
+                <button
+                  type="button"
+                  onClick={() => selectToolsEntity(null)}
+                  className="font-mono text-xs text-[var(--color-outline)] hover:text-[var(--color-alert)]"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="px-2 py-2">
+                <div className="font-mono text-[12px] font-bold text-[var(--color-on-surface)]">
+                  {toolsSelected.label}
+                </div>
+                <div className="label-caps mt-0.5 text-[var(--color-intel)]">
+                  {LAYERS_BY_ID[toolsSelected.layerId]?.name ?? toolsSelected.layerId}
+                </div>
+                <div className="code-data mt-1 text-[10px] text-[var(--color-outline)]">
+                  {toolsSelected.lat.toFixed(4)}°, {toolsSelected.lon.toFixed(4)}°
+                </div>
+              </div>
+              <EntityAttributes properties={toolsSelected.properties} />
+            </div>
+          )}
         </div>
+
+        {toolsSelected && !LAYERS_BY_ID[toolsSelected.layerId]?.approxLocation && (
+          <footer className="border-t border-[var(--color-outline-variant)] p-2">
+            <LocationLinks lat={toolsSelected.lat} lon={toolsSelected.lon} />
+          </footer>
+        )}
       </aside>
     </div>
   );

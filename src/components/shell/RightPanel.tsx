@@ -4,9 +4,11 @@ import { useState } from "react";
 import { LAYERS_BY_ID } from "@/config/layer-registry";
 import { useStore } from "@/core/state/store";
 import { Stat, TacticalButton } from "@/components/ui/primitives";
+import { LocationLinks } from "@/components/panels/LocationLinks";
 import { SatelliteInset } from "@/components/ui/SatelliteInset";
 import { AirportWeather } from "@/components/panels/AirportWeather";
 import { FlightIntel } from "@/components/panels/FlightIntel";
+import { VesselIntel } from "@/components/panels/VesselIntel";
 
 const TIER_LABEL: Record<string, { text: string; color: string }> = {
   confirmed: { text: "OSINT CONFIRMED", color: "var(--color-friendly)" },
@@ -108,6 +110,8 @@ export function RightPanel() {
     /^[A-Za-z0-9]{3,4}$/.test(icao);
   const flightHex = selected.properties.hex as string | undefined;
   const showFlightIntel = selected.layerId === "military-flights" && !!flightHex;
+  const vesselMmsi = selected.properties.mmsi as string | undefined;
+  const showVesselIntel = selected.layerId === "maritime-ais" && !!vesselMmsi;
 
   return (
     <aside
@@ -192,45 +196,14 @@ export function RightPanel() {
         {showFlightIntel && flightHex && (
           <FlightIntel hex={flightHex} properties={selected.properties} />
         )}
+        {showVesselIntel && vesselMmsi && (
+          <VesselIntel mmsi={String(vesselMmsi)} properties={selected.properties} />
+        )}
       </div>
 
       <footer className="border-t border-[var(--color-outline-variant)] p-2">
         {!layer?.approxLocation && (
-          <div className="flex gap-2">
-            <TacticalButton
-              className="flex-1"
-              onClick={() =>
-                window.open(
-                  `https://www.openstreetmap.org/?mlat=${selected.lat}&mlon=${selected.lon}#map=12/${selected.lat}/${selected.lon}`,
-                  "_blank",
-                )
-              }
-            >
-              OPEN OSM
-            </TacticalButton>
-            <TacticalButton
-              className="flex-1"
-              onClick={() =>
-                window.open(
-                  `https://www.google.com/maps?q=${selected.lat},${selected.lon}&z=12`,
-                  "_blank",
-                )
-              }
-            >
-              GOOGLE MAPS
-            </TacticalButton>
-            <TacticalButton
-              className="flex-1"
-              onClick={() =>
-                window.open(
-                  `https://browser.dataspace.copernicus.eu/?zoom=12&lat=${selected.lat}&lng=${selected.lon}`,
-                  "_blank",
-                )
-              }
-            >
-              IMINT
-            </TacticalButton>
-          </div>
+          <LocationLinks lat={selected.lat} lon={selected.lon} />
         )}
         {layer?.source.attribution && (
           <div className="label-caps mt-2 text-[var(--color-outline)]">

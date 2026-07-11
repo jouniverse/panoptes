@@ -20,6 +20,11 @@ export interface TleBundle {
 }
 
 export const GOV_MIL_TLE_PATH = join(process.cwd(), "public/data/gov-military-tles.json");
+/** ISO-8601 fetch time — checked by `scripts/ensure-fresh-tles.mjs` before dev. */
+export const GOV_MIL_TLE_TIMESTAMP_PATH = join(
+  process.cwd(),
+  "public/data/gov-military-tles.fetched-at",
+);
 
 /** TLE refresh interval — Space-Track updates multiple times daily. */
 export const TLE_TTL_LIVE_MS = 24 * 60 * 60_000;
@@ -86,6 +91,7 @@ export function writeDiskTleBundle(bundle: TleBundle): void {
   try {
     mkdirSync(join(process.cwd(), "public/data"), { recursive: true });
     writeFileSync(GOV_MIL_TLE_PATH, `${JSON.stringify(bundle)}\n`, "utf8");
+    writeFileSync(GOV_MIL_TLE_TIMESTAMP_PATH, `${bundle.fetchedAt}\n`, "utf8");
   } catch {
     /* read-only FS on serverless — local/script writes only */
   }
