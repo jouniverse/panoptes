@@ -159,7 +159,7 @@ function buildVectorLayer(
   return new GeoJsonLayer({
     id: `layer-${def.id}`,
     data: ld.raw,
-    pickable: true,
+    pickable: def.pickable !== false,
     stroked: true,
     filled: def.kind === "polygon",
     getLineColor: color,

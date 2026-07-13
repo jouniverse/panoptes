@@ -80,7 +80,8 @@ export function MapLegend() {
             </label>
           </div>
           <div className="mt-1.5 text-[9px] leading-tight text-[var(--color-on-surface-variant)]">
-            Terrestrial AIS — coastal ~200 km. Military AIS rarely transmitted.
+            Terrestrial AIS — coastal ~50 km. Military shown globally; cargo/tanker limited to
+            viewport (cyan ring).
           </div>
         </div>
       )}

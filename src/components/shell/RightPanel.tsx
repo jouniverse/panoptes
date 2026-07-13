@@ -4,11 +4,13 @@ import { useState } from "react";
 import { LAYERS_BY_ID } from "@/config/layer-registry";
 import { useStore } from "@/core/state/store";
 import { Stat, TacticalButton } from "@/components/ui/primitives";
+import { useIsNarrow } from "@/hooks/useMobileLayout";
 import { LocationLinks } from "@/components/panels/LocationLinks";
 import { SatelliteInset } from "@/components/ui/SatelliteInset";
 import { AirportWeather } from "@/components/panels/AirportWeather";
 import { FlightIntel } from "@/components/panels/FlightIntel";
 import { VesselIntel } from "@/components/panels/VesselIntel";
+import type { GeoEntity } from "@/core/types";
 
 const TIER_LABEL: Record<string, { text: string; color: string }> = {
   confirmed: { text: "OSINT CONFIRMED", color: "var(--color-friendly)" },
@@ -46,6 +48,23 @@ function fmtValue(key: string, v: unknown): string {
     if (!Number.isNaN(ms)) return fmtDate(ms);
   }
   return String(v);
+}
+
+/** Map links / readouts use source coords when a marker was ring-jittered for visibility. */
+function displayCoords(entity: GeoEntity): { lat: number; lon: number; jittered: boolean } {
+  const p = entity.properties;
+  if (
+    p.jittered &&
+    typeof p.source_latitude === "number" &&
+    typeof p.source_longitude === "number"
+  ) {
+    return {
+      lat: p.source_latitude as number,
+      lon: p.source_longitude as number,
+      jittered: true,
+    };
+  }
+  return { lat: entity.lat, lon: entity.lon, jittered: false };
 }
 
 /**
@@ -92,6 +111,8 @@ export function RightPanel() {
   const selected = useStore((s) => s.selected);
   const rightOpen = useStore((s) => s.rightOpen);
   const select = useStore((s) => s.select);
+  const setRightOpen = useStore((s) => s.setRightOpen);
+  const narrow = useIsNarrow();
 
   if (!rightOpen || !selected) return null;
 
@@ -112,62 +133,59 @@ export function RightPanel() {
   const showFlightIntel = selected.layerId === "military-flights" && !!flightHex;
   const vesselMmsi = selected.properties.mmsi as string | undefined;
   const showVesselIntel = selected.layerId === "maritime-ais" && !!vesselMmsi;
+  const coords = displayCoords(selected);
 
-  return (
-    <aside
-      aria-label="Entity intelligence"
-      className="pan-glass absolute inset-y-0 right-0 z-30 flex w-[340px] max-w-[88vw] shrink-0 flex-col border-l border-[var(--color-outline-variant)] md:relative md:z-auto"
-    >
-      <header className="flex items-center justify-between border-b border-[var(--color-outline-variant)] px-3 py-2">
-        <span className="label-caps text-[var(--color-outline)]">
-          TARGET PROFILE // {selected.id.slice(0, 12)}
-        </span>
-        <button
-          type="button"
-          onClick={() => select(null)}
-          className="font-mono text-xs text-[var(--color-outline)] hover:text-[var(--color-alert)]"
-        >
-          ✕
-        </button>
-      </header>
+  const footerLinks = !layer?.approxLocation ? (
+    <LocationLinks lat={coords.lat} lon={coords.lon} />
+  ) : null;
 
-      <div className="flex-1 overflow-y-auto p-3">
-        <div className="flex items-start justify-between gap-2">
-          <h2 className="font-mono text-base font-bold leading-tight text-[var(--color-on-surface)]">
-            {selected.label}
-          </h2>
-          {tier && (
-            <span
-              className="shrink-0 border px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-[0.1em]"
-              style={{ borderColor: tier.color, color: tier.color }}
-            >
-              {tier.text}
-            </span>
-          )}
-        </div>
+  const footerAttribution = layer?.source.attribution ? (
+    <div className="label-caps mt-2 text-[var(--color-outline)]">
+      SRC: {layer.source.attribution}
+    </div>
+  ) : null;
 
-        {!layer?.approxLocation && <SatelliteInset lat={selected.lat} lon={selected.lon} />}
+  const panelBody = (
+    <>
+      <div className="flex items-start justify-between gap-2">
+        <h2 className="font-mono text-base font-bold leading-tight text-[var(--color-on-surface)]">
+          {selected.label}
+        </h2>
+        {tier && (
+          <span
+            className="shrink-0 border px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-[0.1em]"
+            style={{ borderColor: tier.color, color: tier.color }}
+          >
+            {tier.text}
+          </span>
+        )}
+      </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          {!layer?.approxLocation && (
-            <Stat
-              label="Coordinates"
-              value={
-                <span className="code-data">
-                  {selected.lat.toFixed(4)}
-                  <br />
-                  {selected.lon.toFixed(4)}
-                </span>
-              }
-            />
-          )}
+      {!layer?.approxLocation && (
+        <SatelliteInset lat={coords.lat} lon={coords.lon} />
+      )}
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {!layer?.approxLocation && (
           <Stat
-            label="Classification"
-            value={<span className="text-xs">{layer?.name ?? selected.layerId}</span>}
-            accent={layer?.color}
+            label={coords.jittered ? "Source location" : "Coordinates"}
+            value={
+              <span className="code-data">
+                {coords.lat.toFixed(4)}
+                <br />
+                {coords.lon.toFixed(4)}
+              </span>
+            }
           />
-        </div>
+        )}
+        <Stat
+          label="Classification"
+          value={<span className="text-xs">{layer?.name ?? selected.layerId}</span>}
+          accent={layer?.color}
+        />
+      </div>
 
+      {!showFlightIntel && (
         <div className="mt-3 border border-[var(--color-outline-variant)]">
           <div className="label-caps border-b border-[var(--color-outline-variant)] px-2 py-1">
             ATTRIBUTES
@@ -178,39 +196,74 @@ export function RightPanel() {
             ))}
           </dl>
         </div>
+      )}
 
-        {layer && (
-          <p className="mt-3 text-[11px] leading-relaxed text-[var(--color-on-surface-variant)]">
-            {layer.description}
-          </p>
-        )}
+      {layer && (
+        <p className="mt-3 text-[11px] leading-relaxed text-[var(--color-on-surface-variant)]">
+          {layer.description}
+        </p>
+      )}
 
-        {showWeather && (
-          <AirportWeather
-            icao={icao.toUpperCase()}
-            lon={selected.lon}
-            lat={selected.lat}
-            country={(selected.properties.iso_country as string | undefined)?.trim()}
-          />
-        )}
-        {showFlightIntel && flightHex && (
-          <FlightIntel hex={flightHex} properties={selected.properties} />
-        )}
-        {showVesselIntel && vesselMmsi && (
-          <VesselIntel mmsi={String(vesselMmsi)} properties={selected.properties} />
-        )}
-      </div>
+      {showWeather && (
+        <AirportWeather
+          icao={icao.toUpperCase()}
+          lon={selected.lon}
+          lat={selected.lat}
+          country={(selected.properties.iso_country as string | undefined)?.trim()}
+        />
+      )}
+      {showFlightIntel && flightHex && (
+        <FlightIntel hex={flightHex} properties={selected.properties} />
+      )}
+      {showVesselIntel && vesselMmsi && (
+        <VesselIntel mmsi={String(vesselMmsi)} properties={selected.properties} />
+      )}
+    </>
+  );
 
-      <footer className="border-t border-[var(--color-outline-variant)] p-2">
-        {!layer?.approxLocation && (
-          <LocationLinks lat={selected.lat} lon={selected.lon} />
-        )}
-        {layer?.source.attribution && (
-          <div className="label-caps mt-2 text-[var(--color-outline)]">
-            SRC: {layer.source.attribution}
-          </div>
-        )}
-      </footer>
+  return (
+    <aside
+      aria-label="Entity intelligence"
+      className={
+        narrow
+          ? "pan-glass absolute inset-0 z-50 flex h-full max-h-full min-h-0 w-full flex-col overflow-hidden border-l border-[var(--color-outline-variant)]"
+          : "pan-glass absolute inset-y-0 right-0 z-30 flex min-h-0 w-[340px] max-w-[88vw] shrink-0 flex-col overflow-hidden border-l border-[var(--color-outline-variant)] md:relative md:z-auto"
+      }
+    >
+      <header className="flex shrink-0 items-center justify-between border-b border-[var(--color-outline-variant)] px-3 py-2">
+        <span className="label-caps text-[var(--color-outline)]">
+          TARGET PROFILE // {selected.id.slice(0, 12)}
+        </span>
+        <button
+          type="button"
+          onClick={() => (narrow ? setRightOpen(false) : select(null))}
+          className="font-mono text-xs text-[var(--color-outline)] hover:text-[var(--color-alert)]"
+        >
+          ✕
+        </button>
+      </header>
+
+      {narrow ? (
+        <div className="pan-scroll-y min-h-0 flex-1">
+          <div className="p-3">{panelBody}</div>
+          {(footerLinks || footerAttribution) && (
+            <footer className="shrink-0 border-t border-[var(--color-outline-variant)] p-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+              {footerLinks}
+              {footerAttribution}
+            </footer>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="pan-scroll-y min-h-0 flex-1 p-3">{panelBody}</div>
+          {(footerLinks || footerAttribution) && (
+            <footer className="shrink-0 border-t border-[var(--color-outline-variant)] p-2">
+              {footerLinks}
+              {footerAttribution}
+            </footer>
+          )}
+        </>
+      )}
     </aside>
   );
 }

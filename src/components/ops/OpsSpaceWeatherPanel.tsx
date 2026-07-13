@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createChart, LineSeries, type IChartApi } from "lightweight-charts";
 import { Panel } from "@/components/ui/primitives";
+import { useOpsStore } from "@/core/state/ops-store";
 import type { FeedHealth } from "@/core/types";
 import type { SpaceWeatherPayload } from "@/lib/space-weather";
 import { kpColor, kpHint } from "@/lib/space-weather";
@@ -107,6 +108,8 @@ export function OpsSpaceWeatherPanel({
   health: FeedHealth;
 }) {
   const [tab, setTab] = useState<"weather" | "alerts">("weather");
+  const selectItem = useOpsStore((s) => s.selectItem);
+  const selectedId = useOpsStore((s) => s.selectedItem?.id ?? null);
 
   if (!payload || payload.error) {
     return (
@@ -180,12 +183,35 @@ export function OpsSpaceWeatherPanel({
         </>
       ) : (
         <ul className="max-h-72 divide-y divide-[var(--color-grid)] overflow-y-auto">
-          {payload.alerts.map((a, i) => (
-            <li key={i} className="px-3 py-1.5">
-              <div className="label-caps text-[var(--color-outline)]">{a.time ?? "—"}</div>
-              <p className="line-clamp-2 font-mono text-[10px] text-[var(--color-on-surface-variant)]">{a.title}</p>
-            </li>
-          ))}
+          {payload.alerts.map((a, i) => {
+            const id = `swpc-alert-${i}`;
+            return (
+              <li
+                key={id}
+                title={a.message}
+                className={`cursor-pointer px-3 py-1.5 hover:bg-[rgba(0,209,255,0.05)] ${
+                  selectedId === id ? "bg-[rgba(255,199,0,0.08)]" : ""
+                }`}
+                onClick={() =>
+                  selectItem({
+                    source: "space-weather",
+                    id,
+                    title: a.title,
+                    props: {
+                      time: a.time,
+                      text: a.message,
+                      message_type: "SWPC Alert",
+                    },
+                  })
+                }
+              >
+                <div className="label-caps text-[var(--color-outline)]">{a.time ?? "—"}</div>
+                <p className="line-clamp-2 font-mono text-[10px] text-[var(--color-on-surface-variant)]">
+                  {a.title}
+                </p>
+              </li>
+            );
+          })}
           {!payload.alerts.length && <Empty label="No active SWPC alerts" />}
         </ul>
       )}

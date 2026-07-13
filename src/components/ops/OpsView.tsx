@@ -56,7 +56,7 @@ export function OpsView() {
   ];
 
   return (
-    <div className="pan-grid min-w-0 flex-1 overflow-y-auto p-3">
+    <div className="pan-grid pan-scroll-y min-h-0 min-w-0 flex-1 self-stretch p-3 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <OpsMapPanel />
         <OpsDetailsPanel />

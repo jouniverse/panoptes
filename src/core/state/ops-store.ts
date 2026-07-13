@@ -7,7 +7,8 @@ export type OpsItemSource =
   | "maritime-ais"
   | "naval-news"
   | "news"
-  | "space-launch";
+  | "space-launch"
+  | "space-weather";
 
 export interface OpsSelectedItem {
   source: OpsItemSource;

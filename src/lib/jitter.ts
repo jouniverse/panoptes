@@ -7,6 +7,7 @@ export function clusterJitter(
   lat: number,
   index: number,
   count: number,
+  opts?: { baseR?: number; ringStep?: number },
 ): [number, number] {
   if (!count || count <= 1) return [lon, lat];
 
@@ -16,8 +17,9 @@ export function clusterJitter(
   const inRing = Math.min(perRing, count - ring * perRing);
   if (inRing <= 0) return [lon, lat];
 
-  const baseR = 0.05;
-  const R = baseR + ring * 0.04;
+  const baseR = opts?.baseR ?? 0.05;
+  const ringStep = opts?.ringStep ?? 0.04;
+  const R = baseR + ring * ringStep;
   const ang = (pos / inRing) * Math.PI * 2;
   const plat = lat + R * Math.sin(ang);
   const plon = lon + (R * Math.cos(ang)) / Math.max(0.25, Math.cos((lat * Math.PI) / 180));

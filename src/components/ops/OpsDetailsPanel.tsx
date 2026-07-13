@@ -43,10 +43,12 @@ const LABELS: Record<string, string> = {
   mission_description: "Description",
   pad_name: "Launch pad",
   location: "Location",
-  agencies: "Agencies",
+  message_type: "Message type",
+  message: "Alert text",
 };
 
 function formatPropValue(k: string, v: unknown): string {
+  if (k === "text" || k === "message") return String(v);
   if (k === "time" && typeof v === "number") {
     const ms = v > 1e11 ? v : v > 1e9 ? v * 1000 : NaN;
     if (Number.isFinite(ms)) {
@@ -80,14 +82,26 @@ export function OpsDetailsPanel() {
           <dl className="divide-y divide-[var(--color-grid)] font-mono text-[11px]">
             {Object.entries(item.props)
               .filter(([, v]) => v != null && v !== "")
-              .map(([k, v]) => (
-                <div key={k} className="flex justify-between gap-2 py-1">
-                  <dt className="text-[var(--color-outline)]">{LABELS[k] ?? k.replace(/_/g, " ")}</dt>
-                  <dd className="max-w-[60%] text-right text-[var(--color-on-surface-variant)]">
-                    {formatPropValue(k, v)}
-                  </dd>
-                </div>
-              ))}
+              .map(([k, v]) => {
+                const isLong = k === "text" || k === "message";
+                return (
+                  <div
+                    key={k}
+                    className={isLong ? "py-2" : "flex justify-between gap-2 py-1"}
+                  >
+                    <dt className="text-[var(--color-outline)]">{LABELS[k] ?? k.replace(/_/g, " ")}</dt>
+                    <dd
+                      className={
+                        isLong
+                          ? "mt-1 whitespace-pre-wrap text-[var(--color-on-surface-variant)]"
+                          : "max-w-[60%] text-right text-[var(--color-on-surface-variant)]"
+                      }
+                    >
+                      {formatPropValue(k, v)}
+                    </dd>
+                  </div>
+                );
+              })}
           </dl>
         </div>
       )}

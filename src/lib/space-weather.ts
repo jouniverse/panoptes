@@ -14,7 +14,7 @@ export interface SwpcForecastPoint {
 export interface SpaceWeatherPayload {
   kp: number | null;
   kpTime?: string;
-  alerts: { title: string; time?: string }[];
+  alerts: { title: string; time?: string; message: string }[];
   ap: SwpcForecastPoint[];
   f107: SwpcForecastPoint[];
 }
@@ -95,10 +95,11 @@ export async function loadSpaceWeather(): Promise<SpaceWeatherPayload> {
     ),
   ]);
 
-  const alerts = (alertsRaw ?? []).map((a) => ({
-    title: String(a.message ?? a.message_type ?? "Alert").slice(0, 200),
-    time: a.issue_datetime,
-  }));
+  const alerts = (alertsRaw ?? []).map((a) => {
+    const message = String(a.message ?? a.message_type ?? "Alert");
+    const title = message.split("\n")[0]?.trim().slice(0, 120) || "SWPC Alert";
+    return { title, time: a.issue_datetime, message };
+  });
 
   const { ap, f107 } = buildForecastSeries(forecastRaw?.data ?? []);
   const { kp, kpTime } = parseKp(kpRaw);

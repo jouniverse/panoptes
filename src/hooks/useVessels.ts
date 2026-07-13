@@ -33,7 +33,7 @@ function inViewport(v: Vessel, vp: NonNullable<UseVesselsOpts["viewport"]>) {
   return lonOk && v.lat >= vp.south && v.lat <= vp.north;
 }
 
-function vesselToEntity(v: Vessel): GeoEntity {
+export function vesselToEntity(v: Vessel): GeoEntity {
   const label = v.watchlistName || v.name || `MMSI ${v.mmsi}`;
   const heading = v.trueHeading != null && v.trueHeading < 360 ? v.trueHeading : (v.cog ?? 0);
   return {
@@ -110,25 +110,29 @@ export function useVessels(opts: UseVesselsOpts = {}) {
     void storeVersion;
     if (!enabled) return [];
 
-    let list = vesselStore
+    const all = vesselStore
       .getAll()
-      .filter(
-        (v) =>
-          v.lat != null &&
-          v.lon != null &&
-          categoryAllowed(v.aisCategory, showMilitary, showCargoTanker),
-      );
+      .filter((v) => v.lat != null && v.lon != null);
+
+    const militaryList = showMilitary
+      ? all.filter((v) => v.aisCategory === "military")
+      : [];
+
+    let merchantList = showCargoTanker
+      ? all.filter((v) => v.aisCategory === "cargo" || v.aisCategory === "tanker")
+      : [];
 
     if (viewport) {
-      list = list.filter((v) => inViewport(v, viewport));
+      merchantList = merchantList.filter((v) => inViewport(v, viewport));
     }
 
-    if (list.length > MAX_RENDER) {
-      list.sort((a, b) => b.updatedAt - a.updatedAt);
-      list = list.slice(0, MAX_RENDER);
+    let combined = [...militaryList, ...merchantList];
+    if (combined.length > MAX_RENDER) {
+      combined.sort((a, b) => b.updatedAt - a.updatedAt);
+      combined = combined.slice(0, MAX_RENDER);
     }
 
-    return list.map(vesselToEntity);
+    return combined.map(vesselToEntity);
   }, [enabled, storeVersion, showMilitary, showCargoTanker, viewport]);
 
   const rawVessels = useMemo((): Vessel[] => {

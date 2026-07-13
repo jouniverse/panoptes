@@ -15,6 +15,8 @@ export function FlightIntel({ hex, properties }: { hex: string; properties: Reco
   });
 
   const enrichKeys = [
+    "callsign",
+    "hex",
     "operator",
     "owner",
     "operator_country",
@@ -38,6 +40,10 @@ export function FlightIntel({ hex, properties }: { hex: string; properties: Reco
 
   return (
     <div className="mt-3 space-y-3">
+      <p className="text-[10px] leading-snug text-[var(--color-on-surface-variant)]">
+        Live ADS-B track merged with military registry enrichment (adsb.lol, IntelSky, OpenSky).
+        Source field shows which feeds contributed.
+      </p>
       {photoQ.data?.url && (
         <div className="border border-[var(--color-outline-variant)]">
           <div className="label-caps border-b border-[var(--color-outline-variant)] px-2 py-1">

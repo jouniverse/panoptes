@@ -6,7 +6,6 @@ import { RightPanel } from "@/components/shell/RightPanel";
 import { MapControls } from "@/components/map/MapControls";
 import { MapLegend } from "@/components/map/MapLegend";
 import { HoverTooltip } from "@/components/map/HoverTooltip";
-import { TimelineBar } from "@/components/map/TimelineBar";
 import { useStore } from "@/core/state/store";
 
 // deck.gl + canvas APIs are browser-only.
@@ -25,14 +24,13 @@ export function GeospatialView() {
   const basemapStyle = useStore((s) => s.basemapStyle);
 
   return (
-    <>
+    <div className="flex min-h-0 min-w-0 flex-1 self-stretch">
       <LeftRail />
       <div className="pan-crosshair pan-frame relative flex min-w-0 flex-1">
         <MapCanvas />
         <MapControls />
         <MapLegend />
         <HoverTooltip />
-        <TimelineBar />
         {basemapStyle === "satellite" && (
           <div className="pointer-events-none absolute bottom-3 left-3 z-10 label-caps text-[9px] text-[var(--color-outline)]">
             Esri World Imagery
@@ -40,6 +38,6 @@ export function GeospatialView() {
         )}
       </div>
       <RightPanel />
-    </>
+    </div>
   );
 }

@@ -72,16 +72,17 @@ function roundGeometry(geom, decimals = 2) {
   return geom;
 }
 
-/** Ring jitter for stacked MIDLOC coordinates (mirrors src/lib/jitter.ts). */
-function clusterJitter(lon, lat, index, count) {
+/** Ring jitter for stacked coordinates (mirrors src/lib/jitter.ts). */
+function clusterJitter(lon, lat, index, count, opts = {}) {
   if (!count || count <= 1) return [lon, lat];
   const perRing = 16;
   const ring = Math.floor(index / perRing);
   const pos = index % perRing;
   const inRing = Math.min(perRing, count - ring * perRing);
   if (inRing <= 0) return [lon, lat];
-  const baseR = 0.05;
-  const R = baseR + ring * 0.04;
+  const baseR = opts.baseR ?? 0.05;
+  const ringStep = opts.ringStep ?? 0.04;
+  const R = baseR + ring * ringStep;
   const ang = (pos / inRing) * Math.PI * 2;
   const plat = lat + R * Math.sin(ang);
   const plon = lon + (R * Math.cos(ang)) / Math.max(0.25, Math.cos((lat * Math.PI) / 180));
@@ -322,25 +323,63 @@ const tasks = {
     // {city_coords}). Geometry is already [lon, lat]; keep the correct fields
     // so the right panel shows name / company / city / country accurately.
     const fc = readJSON(join(SRC, "data-centers/datacenters.geojson"));
-    const features = fc.features
+    const raw = fc.features
       .filter(
         (f) =>
           f.geometry &&
           Array.isArray(f.geometry.coordinates) &&
           f.geometry.coordinates.length === 2,
       )
-      .map((f) => ({
+      .map((f) => {
+        const [srcLon, srcLat] = f.geometry.coordinates;
+        return {
+          srcLon,
+          srcLat,
+          properties: pick(f.properties, [
+            "name",
+            "company",
+            "city",
+            "country",
+            "street",
+            "address",
+          ]),
+        };
+      });
+
+    // Many facilities share city-centroid coordinates — fan out on a ring
+    // (same clusterJitter as Historical Conflicts / GDELT conflict events).
+    const groups = new Map();
+    raw.forEach((r, i) => {
+      const key = `${Number(r.srcLon).toFixed(5)},${Number(r.srcLat).toFixed(5)}`;
+      const g = groups.get(key);
+      if (g) g.push(i);
+      else groups.set(key, [i]);
+    });
+
+    const features = raw.map((r, i) => {
+      const key = `${Number(r.srcLon).toFixed(5)},${Number(r.srcLat).toFixed(5)}`;
+      const group = groups.get(key);
+      const clusterIndex = group.indexOf(i);
+      const clusterSize = group.length;
+      const jittered = clusterSize > 1;
+      const [lon, lat] = jittered
+        ? clusterJitter(r.srcLon, r.srcLat, clusterIndex, clusterSize, {
+            baseR: 0.006,
+            ringStep: 0.003,
+          })
+        : [r.srcLon, r.srcLat];
+      return {
         type: "Feature",
-        geometry: f.geometry,
-        properties: pick(f.properties, [
-          "name",
-          "company",
-          "city",
-          "country",
-          "street",
-          "address",
-        ]),
-      }));
+        geometry: { type: "Point", coordinates: [lon, lat] },
+        properties: {
+          ...r.properties,
+          source_longitude: r.srcLon,
+          source_latitude: r.srcLat,
+          cluster_size: clusterSize,
+          jittered,
+        },
+      };
+    });
     write("data-centers.geojson", features);
   },
 

@@ -31,6 +31,7 @@ export const LAYERS: LayerDefinition[] = [
     color: PALETTE.outline,
     renderer: "both",
     defaultEnabled: true,
+    pickable: false,
     description: "Admin-0 sovereign boundaries (Natural Earth).",
     source: {
       kind: "static",
@@ -368,7 +369,8 @@ export const LAYERS: LayerDefinition[] = [
     renderer: "both",
     defaultEnabled: false,
     minZoom: 2,
-    description: "Global data-center facilities (cloud / colocation).",
+    description:
+      "Global data-center facilities (cloud / colocation). Overlapping city-centroid locations are jittered on a tight ring for visibility.",
     source: {
       kind: "static",
       ref: "data-centers.geojson",

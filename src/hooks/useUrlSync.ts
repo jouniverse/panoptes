@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { LAYERS } from "@/config/layer-registry";
+import { isMobileLayout } from "@/hooks/useMobileLayout";
 import { useStore, type BasemapStyle, type Projection } from "@/core/state/store";
 
 /**
@@ -30,7 +31,10 @@ export function useUrlSync() {
       });
     }
     const proj = p.get("proj");
-    if (proj === "globe" || proj === "flat") s.setProjection(proj as Projection);
+    if (proj === "globe" || proj === "flat") {
+      const narrow = isMobileLayout();
+      s.setProjection(narrow && proj === "globe" ? "flat" : (proj as Projection));
+    }
 
     const basemap = p.get("basemap");
     if (basemap === "strategic" || basemap === "satellite") {

@@ -13,14 +13,17 @@ import type { Layer } from "@deck.gl/core";
 import type { FeatureCollection } from "geojson";
 import { useStore, type ViewState } from "@/core/state/store";
 import { useLayerData } from "@/hooks/useLayerData";
+import { useIsNarrow } from "@/hooks/useMobileLayout";
 import { useUrlSync } from "@/hooks/useUrlSync";
 import { useSatellites } from "@/hooks/useSatellites";
-import { useVessels } from "@/hooks/useVessels";
+import { useVessels, vesselToEntity } from "@/hooks/useVessels";
 import { basemapLayer } from "./basemap";
 import { useDeckLayers } from "./useDeckLayers";
 import type { GeoEntity, FeedHealth } from "@/core/types";
 import type { LayerData } from "@/hooks/useLayerData";
 import { computeOrbitGroundTrack, orbitTrackPathsForProjection } from "@/lib/satellite-track";
+import { liveSearchIndex } from "@/lib/live-search-index";
+import { vesselStore } from "@/lib/vessel-store";
 import { RGB } from "@/config/theme";
 import satMeta from "@/data/military-satellites-meta.json";
 
@@ -46,6 +49,7 @@ const SAT_META = satMeta as Record<
 
 export default function MapCanvas() {
   useUrlSync();
+  const narrow = useIsNarrow();
   const projection = useStore((s) => s.projection);
   const basemapStyle = useStore((s) => s.basemapStyle);
   const viewState = useStore((s) => s.viewState);
@@ -54,6 +58,7 @@ export default function MapCanvas() {
   const hover = useStore((s) => s.hover);
   const selected = useStore((s) => s.selected);
   const enabled = useStore((s) => s.enabled);
+  const aisShowCargoTanker = useStore((s) => s.aisShowCargoTanker);
   const setHealth = useStore((s) => s.setHealth);
   const setCount = useStore((s) => s.setCount);
 
@@ -140,6 +145,59 @@ export default function MapCanvas() {
     setCount("maritime-ais", aisVessels.length);
   }, [aisEnabled, aisHealthRaw, aisVessels.length, setHealth, setCount]);
 
+  // Publish live worker feeds for TopBar layer search (global vessel list, no viewport cull).
+  useEffect(() => {
+    if (!satEnabled || satPositions.length === 0) {
+      liveSearchIndex.clear("satellites");
+      return;
+    }
+    const satEntities: GeoEntity[] = satPositions.map((p) => {
+      const meta = p.norad != null ? SAT_META[String(p.norad)] : undefined;
+      return {
+        id: `sat-${p.name.replace(/\s+/g, "_")}`,
+        layerId: "satellites",
+        lon: p.lon,
+        lat: p.lat,
+        label: p.name,
+        properties: {
+          name: p.name,
+          altitude_km: Math.round(p.alt),
+          norad: p.norad,
+          country: meta?.country,
+          operator: meta?.operator,
+          users: meta?.users,
+          purpose: meta?.purpose,
+          detail: meta?.detail,
+          orbit: meta?.orbit,
+        },
+      };
+    });
+    liveSearchIndex.set("satellites", satEntities);
+  }, [satEnabled, satPositions]);
+
+  useEffect(() => {
+    if (!aisEnabled) {
+      liveSearchIndex.clear("maritime-ais");
+      return;
+    }
+    const publish = () => {
+      const entities = vesselStore
+        .getAll()
+        .filter((v) => v.lat != null && v.lon != null)
+        .map(vesselToEntity);
+      liveSearchIndex.set("maritime-ais", entities);
+    };
+    publish();
+    return vesselStore.subscribe(publish);
+  }, [aisEnabled]);
+
+  useEffect(() => {
+    return () => {
+      liveSearchIndex.clear("satellites");
+      liveSearchIndex.clear("maritime-ais");
+    };
+  }, []);
+
   const onClusterClick = useCallback(
     (lon: number, lat: number, zoom: number) => {
       setViewState({ ...useStore.getState().viewState, longitude: lon, latitude: lat, zoom });
@@ -154,6 +212,32 @@ export default function MapCanvas() {
     viewCenter: { longitude: viewState.longitude, latitude: viewState.latitude },
     onClusterClick,
   });
+
+  /** Low-opacity ring showing cargo/tanker viewport cull boundary (military is global). */
+  const aisViewportLayer = useMemo((): Layer[] => {
+    if (!aisEnabled || !aisShowCargoTanker) return [];
+    const { west, south, east, north } = aisViewport;
+    const ring: [number, number][] = [
+      [west, north],
+      [east, north],
+      [east, south],
+      [west, south],
+      [west, north],
+    ];
+    return [
+      new PathLayer({
+        id: "ais-merchant-viewport",
+        data: [{ path: ring }],
+        pickable: false,
+        widthUnits: "pixels",
+        getPath: (d: { path: [number, number][] }) => d.path,
+        getColor: [RGB.intel[0], RGB.intel[1], RGB.intel[2], 70],
+        getWidth: 2,
+        capRounded: false,
+        jointRounded: false,
+      }),
+    ];
+  }, [aisEnabled, aisShowCargoTanker, aisViewport]);
 
   const satelliteTrackLayers = useMemo((): Layer[] => {
     if (!satEnabled || selected?.layerId !== "satellites") return [];
@@ -214,8 +298,8 @@ export default function MapCanvas() {
     [basemapStyle, projection],
   );
   const layers: Layer[] = useMemo(
-    () => [base, ...dataLayers, ...satelliteTrackLayers],
-    [base, dataLayers, satelliteTrackLayers],
+    () => [base, ...aisViewportLayer, ...dataLayers, ...satelliteTrackLayers],
+    [base, aisViewportLayer, dataLayers, satelliteTrackLayers],
   );
 
   // Distinct view ids per projection: when the id stays the same, deck.gl reuses
@@ -254,6 +338,7 @@ export default function MapCanvas() {
       views={view}
       viewState={viewState}
       onViewStateChange={(e) => handleViewState(e.viewState as Partial<ViewState>)}
+      pickingRadius={narrow ? 14 : 4}
       controller={{
         // Pin the controller class to the active projection so a GlobeViewport is
         // never driven by a MapController (and vice versa).

@@ -1,11 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import { Panel } from "@/components/ui/primitives";
 import { useOpsStore } from "@/core/state/ops-store";
 import type { FeedHealth } from "@/core/types";
 import type { Vessel } from "@/lib/vessel-store";
 import { vesselListLabel } from "@/components/panels/VesselIntel";
 import { FeedList } from "./ops-utils";
+
+type AisTab = "military" | "merchant";
 
 export function OpsMaritimeAisPanel({
   vessels,
@@ -14,13 +17,18 @@ export function OpsMaritimeAisPanel({
   vessels: Vessel[];
   health: FeedHealth;
 }) {
+  const [tab, setTab] = useState<AisTab>("military");
   const selectItem = useOpsStore((s) => s.selectItem);
   const selectedId = useOpsStore((s) => s.selectedItem?.id ?? null);
 
-  const military = vessels.filter((v) => v.aisCategory === "military").length;
-  const merchant = vessels.length - military;
+  const militaryVessels = vessels.filter((v) => v.aisCategory === "military");
+  const merchantVessels = vessels.filter(
+    (v) => v.aisCategory === "cargo" || v.aisCategory === "tanker",
+  );
 
-  const rows = vessels.slice(0, 80).map((v) => ({
+  const activeList = tab === "military" ? militaryVessels : merchantVessels.slice(0, 200);
+
+  const rows = activeList.map((v) => ({
     id: v.mmsi,
     primary: vesselListLabel(v),
     secondary: `${v.aisCategory ?? ""} ${v.sog != null ? `${v.sog.toFixed(1)} kt` : ""}`.trim(),
@@ -30,18 +38,35 @@ export function OpsMaritimeAisPanel({
 
   return (
     <Panel title="MARITIME // AIS" status={health} className="lg:col-span-1">
-      <div className="px-3 py-2">
-        <span className="font-mono text-2xl font-bold text-[var(--color-intel)]">
-          {vessels.length}
-        </span>
-        <span className="label-caps ml-2 text-[var(--color-outline)]">VESSELS TRACKED</span>
-        <div className="mt-1 font-mono text-[10px] text-[var(--color-outline)]">
-          {military} military · {merchant} cargo/tanker
-        </div>
+      <div className="flex border-b border-[var(--color-grid)]">
+        {(
+          [
+            ["military", "Military", militaryVessels.length],
+            ["merchant", "Cargo & Tankers", merchantVessels.length],
+          ] as const
+        ).map(([id, label, count]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setTab(id)}
+            className={`label-caps flex-1 px-2 py-1.5 text-[10px] ${
+              tab === id
+                ? "bg-[rgba(0,209,255,0.1)] text-[var(--color-intel)]"
+                : "text-[var(--color-outline)] hover:text-[var(--color-on-surface-variant)]"
+            }`}
+          >
+            {label} ({count})
+          </button>
+        ))}
       </div>
+
       <FeedList
         rows={rows}
-        empty="No vessels — start relay (npm run ais:relay) and ensure AIS_STREAM_KEY is set"
+        empty={
+          tab === "military"
+            ? "No military vessels in stream"
+            : "No cargo/tanker vessels in stream"
+        }
         selectedId={selectedId}
         onSelect={(id) => {
           const row = rows.find((r) => r.id === id);
@@ -71,7 +96,7 @@ export function OpsMaritimeAisPanel({
       />
       <div className="border-t border-[var(--color-outline-variant)] px-3 py-2">
         <div className="label-caps text-[var(--color-outline)]">
-          Terrestrial AIS · coastal ~200 km · relay required locally
+          Terrestrial AIS · coastal ~50 km · relay required locally
         </div>
       </div>
     </Panel>

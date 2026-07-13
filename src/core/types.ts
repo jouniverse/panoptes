@@ -110,6 +110,8 @@ export interface LayerDefinition {
   approxLocation?: boolean;
   /** Layer shown in the rail but not yet implemented (cannot be toggled on). */
   placeholder?: boolean;
+  /** When false, polygons/lines are drawn but do not intercept map clicks. */
+  pickable?: boolean;
   /** Lazy import of the layer module (transform + deck layer factory). */
   load?: () => Promise<unknown>;
 }

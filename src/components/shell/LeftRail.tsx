@@ -10,6 +10,7 @@ import {
 import { useStore, type IntelFilter } from "@/core/state/store";
 import type { FeedHealth, LayerCategory } from "@/core/types";
 import { StatusLight } from "@/components/ui/primitives";
+import { useIsNarrow } from "@/hooks/useMobileLayout";
 
 const MODE_TABS: { id: IntelFilter; label: string }[] = [
   { id: "all", label: "ALL" },
@@ -25,6 +26,8 @@ export function LeftRail() {
   const intelFilter = useStore((s) => s.intelFilter);
   const setIntelFilter = useStore((s) => s.setIntelFilter);
   const leftOpen = useStore((s) => s.leftOpen);
+  const toggleLeft = useStore((s) => s.toggleLeft);
+  const narrow = useIsNarrow();
   const collapsedCats = useStore((s) => s.collapsedCats);
   const toggleCategory = useStore((s) => s.toggleCategory);
 
@@ -46,12 +49,30 @@ export function LeftRail() {
   return (
     <aside
       aria-label="Data layers"
-      className="pan-glass absolute inset-y-0 left-0 z-30 flex w-[232px] max-w-[80vw] shrink-0 flex-col border-r border-[var(--color-outline-variant)] md:relative md:z-auto"
+      className={
+        narrow
+          ? "pan-glass absolute inset-0 z-50 flex h-full max-h-full min-h-0 w-full flex-col overflow-hidden border-r border-[var(--color-outline-variant)]"
+          : "pan-glass absolute inset-y-0 left-0 z-30 flex min-h-0 w-[232px] max-w-[80vw] shrink-0 flex-col overflow-hidden border-r border-[var(--color-outline-variant)] md:relative md:z-auto"
+      }
     >
       <div className="border-b border-[var(--color-outline-variant)] p-3">
-        <div className="headline-sm text-[var(--color-on-surface)]">DATA LAYERS</div>
-        <div className="label-caps mt-0.5 text-[var(--color-outline)]">
-          OPERATIONAL_GRID_V1
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <div className="headline-sm text-[var(--color-on-surface)]">DATA LAYERS</div>
+            <div className="label-caps mt-0.5 text-[var(--color-outline)]">
+              OPERATIONAL_GRID_V1
+            </div>
+          </div>
+          {narrow && (
+            <button
+              type="button"
+              onClick={toggleLeft}
+              aria-label="Close layers panel"
+              className="font-mono text-xs text-[var(--color-outline)] hover:text-[var(--color-alert)]"
+            >
+              ✕
+            </button>
+          )}
         </div>
         <div className="mt-2 flex gap-1">
           {MODE_TABS.map((t) => (
@@ -71,7 +92,7 @@ export function LeftRail() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="pan-scroll-y min-h-0 flex-1 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         {grouped.map(({ category, layers }) => {
           const collapsed = !!collapsedCats[category];
           const activeCount = layers.filter((l) => !l.placeholder && enabled[l.id]).length;

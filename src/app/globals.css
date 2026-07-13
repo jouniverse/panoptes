@@ -54,6 +54,24 @@ body {
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
+  /* iOS Safari: avoid 100vh overflow vs dynamic toolbar */
+  height: 100dvh;
+  max-height: 100dvh;
+}
+
+/* Scroll regions inside flex shells (iOS-safe). */
+.pan-scroll-y {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* App root — dynamic viewport height for mobile Safari. */
+.pan-app-shell {
+  height: 100dvh;
+  min-height: 100dvh;
+  max-height: 100dvh;
 }
 
 /* Micro-grid floor texture (Level 0). */
