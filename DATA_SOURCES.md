@@ -298,7 +298,7 @@ _NOTE: Exact location of data centers is not always available. Street level and 
 | **Build input**  | `static-data/oil-and-gas-infrastructure/oil-and-gas-aggregated/offshore-platforms/offshore-platforms.geojson`                                              |
 | **Upstream**     | [OGIM](https://gee-community-catalog.org/projects/ogim/) · [US DoE](https://arcgis.netl.doe.gov/portal/home/item.html?id=1e1c13b43dfb4af68040598c6f4baf44) |
 
-_NOTE: Current locations of mobile offshore platforms is available from [NGA MSI](https://msi.nga.mil/NavWarnings)_
+_NOTE: Current locations of mobile offshore platforms are available from [NGA MSI](https://msi.nga.mil/NavWarnings)_
 
 #### LNG Terminals / Petroleum Terminals / Oil Refineries
 
