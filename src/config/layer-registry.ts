@@ -370,7 +370,7 @@ export const LAYERS: LayerDefinition[] = [
     defaultEnabled: false,
     minZoom: 2,
     description:
-      "Global data-center facilities (cloud / colocation). Overlapping city-centroid locations are jittered on a tight ring for visibility.",
+      "Global data-center facilities (cloud / colocation). Overlapping markers are jittered by geocode accuracy — exact co-locations stay on building coordinates; city-centroid stacks spread wider for visibility.",
     source: {
       kind: "static",
       ref: "data-centers.geojson",

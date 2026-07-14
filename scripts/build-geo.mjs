@@ -89,6 +89,153 @@ function clusterJitter(lon, lat, index, count, opts = {}) {
   return [plon, plat];
 }
 
+/** Data-center overlap jitter tiers (see notes/data/data-centers/). */
+const DC_JITTER_BY_TIER = {
+  exact_colocation: { baseR: 0.00004, ringStep: 0.00002 },
+  street_level: { baseR: 0.0002, ringStep: 0.0001 },
+  city_centroid: { baseR: 0.002, ringStep: 0.001 },
+  mismatch: { baseR: 0.004, ringStep: 0.002 },
+};
+
+function dcNormalizeAddress(address) {
+  return (address || "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function dcValidationDistM(props) {
+  const v = props?.validation_distance_m;
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function dcLocationTier(props) {
+  const dist = dcValidationDistM(props);
+  const q = props?.geocode_quality || "";
+  const addr = props?.address || "";
+
+  if (q === "source_mismatch") return "mismatch";
+
+  const cityQuality =
+    q === "geocoded_city" ||
+    q === "source_city_center" ||
+    q === "source_unverified";
+  if (cityQuality || (dist != null && dist > 15000) || /\btbc\b/i.test(addr)) {
+    return "city_centroid";
+  }
+
+  if (
+    dist === 0 ||
+    q === "source_exact" ||
+    ((q === "geocoded_street" || q === "geocoded_exact") &&
+      dist != null &&
+      dist <= 200)
+  ) {
+    return "exact_colocation";
+  }
+
+  if (
+    dist != null &&
+    dist <= 2000 &&
+    (q === "geocoded_street" ||
+      q === "geocoded_exact" ||
+      q === "geocoded_neighbourhood")
+  ) {
+    return "street_level";
+  }
+
+  if (dist != null && dist <= 2000) return "street_level";
+  return "city_centroid";
+}
+
+function dcCoordKey(lon, lat) {
+  return `${Number(lon).toFixed(5)},${Number(lat).toFixed(5)}`;
+}
+
+function dcSubGroupKey(record, tier) {
+  if (tier === "exact_colocation") {
+    return `exact|${dcNormalizeAddress(record.properties.address)}`;
+  }
+  if (tier === "street_level") return "street";
+  if (tier === "mismatch") return "mismatch";
+  return "city";
+}
+
+/** Assign overlap group index/size/tier per data-center record. */
+function dcAssignOverlapGroups(raw) {
+  const assignments = raw.map(() => ({
+    clusterIndex: 0,
+    overlapGroupSize: 1,
+    locationTier: "singleton",
+    jittered: false,
+    jitterOpts: null,
+  }));
+
+  const byCoord = new Map();
+  raw.forEach((r, i) => {
+    r._i = i;
+    r._tier = dcLocationTier(r.properties);
+    const k = dcCoordKey(r.srcLon, r.srcLat);
+    if (!byCoord.has(k)) byCoord.set(k, []);
+    byCoord.get(k).push(r);
+  });
+
+  for (const members of byCoord.values()) {
+    if (members.length <= 1) {
+      assignments[members[0]._i].locationTier = members[0]._tier;
+      continue;
+    }
+
+    const cityLike = members.filter(
+      (m) => m._tier === "city_centroid" || m._tier === "mismatch",
+    ).length;
+    const useWholeCoordCity = cityLike > members.length / 2;
+
+    if (useWholeCoordCity) {
+      const tier = members.some((m) => m._tier === "mismatch")
+        ? "mismatch"
+        : "city_centroid";
+      const opts = DC_JITTER_BY_TIER[tier];
+      members.forEach((m, idx) => {
+        assignments[m._i] = {
+          clusterIndex: idx,
+          overlapGroupSize: members.length,
+          locationTier: tier,
+          jittered: true,
+          jitterOpts: opts,
+        };
+      });
+      continue;
+    }
+
+    const subGroups = new Map();
+    for (const m of members) {
+      const sk = dcSubGroupKey(m, m._tier);
+      if (!subGroups.has(sk)) subGroups.set(sk, []);
+      subGroups.get(sk).push(m);
+    }
+
+    for (const sg of subGroups.values()) {
+      if (sg.length <= 1) {
+        assignments[sg[0]._i].locationTier = sg[0]._tier;
+        continue;
+      }
+      const tier = sg[0]._tier;
+      const opts = DC_JITTER_BY_TIER[tier] ?? DC_JITTER_BY_TIER.city_centroid;
+      sg.forEach((m, idx) => {
+        assignments[m._i] = {
+          clusterIndex: idx,
+          overlapGroupSize: sg.length,
+          locationTier: tier,
+          jittered: true,
+          jitterOpts: opts,
+        };
+      });
+    }
+  }
+
+  return assignments;
+}
+
 const VOLCANO_OBS = {
   AVO: "Alaska Volcano Observatory",
   NMI: "Nevado del Ruiz Observatory",
@@ -319,9 +466,6 @@ const tasks = {
   },
 
   "data-centers.geojson"() {
-    // Updated source is a GeoJSON FeatureCollection (was a JSON array of
-    // {city_coords}). Geometry is already [lon, lat]; keep the correct fields
-    // so the right panel shows name / company / city / country accurately.
     const fc = readJSON(join(SRC, "data-centers/datacenters.geojson"));
     const raw = fc.features
       .filter(
@@ -342,31 +486,26 @@ const tasks = {
             "country",
             "street",
             "address",
+            "geocode_quality",
+            "geocode_source",
+            "validation_distance_m",
+            "geocode_confidence",
           ]),
         };
       });
 
-    // Many facilities share city-centroid coordinates — fan out on a ring
-    // (same clusterJitter as Historical Conflicts / GDELT conflict events).
-    const groups = new Map();
-    raw.forEach((r, i) => {
-      const key = `${Number(r.srcLon).toFixed(5)},${Number(r.srcLat).toFixed(5)}`;
-      const g = groups.get(key);
-      if (g) g.push(i);
-      else groups.set(key, [i]);
-    });
+    const overlap = dcAssignOverlapGroups(raw);
 
     const features = raw.map((r, i) => {
-      const key = `${Number(r.srcLon).toFixed(5)},${Number(r.srcLat).toFixed(5)}`;
-      const group = groups.get(key);
-      const clusterIndex = group.indexOf(i);
-      const clusterSize = group.length;
-      const jittered = clusterSize > 1;
-      const [lon, lat] = jittered
-        ? clusterJitter(r.srcLon, r.srcLat, clusterIndex, clusterSize, {
-            baseR: 0.006,
-            ringStep: 0.003,
-          })
+      const a = overlap[i];
+      const [lon, lat] = a.jittered
+        ? clusterJitter(
+            r.srcLon,
+            r.srcLat,
+            a.clusterIndex,
+            a.overlapGroupSize,
+            a.jitterOpts,
+          )
         : [r.srcLon, r.srcLat];
       return {
         type: "Feature",
@@ -375,8 +514,10 @@ const tasks = {
           ...r.properties,
           source_longitude: r.srcLon,
           source_latitude: r.srcLat,
-          cluster_size: clusterSize,
-          jittered,
+          cluster_size: a.overlapGroupSize,
+          overlap_group_size: a.overlapGroupSize,
+          location_tier: a.locationTier,
+          jittered: a.jittered,
         },
       };
     });

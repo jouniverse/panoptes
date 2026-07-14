@@ -51,6 +51,16 @@ function fmtValue(key: string, v: unknown): string {
 }
 
 /** Map links / readouts use source coords when a marker was ring-jittered for visibility. */
+/** Internal map/build fields — hidden from the detail panel attribute list. */
+const HIDDEN_ATTR_KEYS = new Set([
+  "source_longitude",
+  "source_latitude",
+  "jittered",
+  "cluster_size",
+  "overlap_group_size",
+  "location_tier",
+]);
+
 function displayCoords(entity: GeoEntity): { lat: number; lon: number; jittered: boolean } {
   const p = entity.properties;
   if (
@@ -119,7 +129,7 @@ export function RightPanel() {
   const layer = LAYERS_BY_ID[selected.layerId];
   const tier = selected.sourceTier ? TIER_LABEL[selected.sourceTier] : null;
   const entries = Object.entries(selected.properties)
-    .filter(([, v]) => v != null && v !== "")
+    .filter(([k, v]) => v != null && v !== "" && !HIDDEN_ATTR_KEYS.has(k))
     .slice(0, 14);
 
   const icao =
@@ -168,7 +178,13 @@ export function RightPanel() {
       <div className="mt-3 grid grid-cols-2 gap-2">
         {!layer?.approxLocation && (
           <Stat
-            label={coords.jittered ? "Source location" : "Coordinates"}
+            label={
+              coords.jittered
+                ? selected.properties.location_tier === "exact_colocation"
+                  ? "Source location (exact)"
+                  : "Source location"
+                : "Coordinates"
+            }
             value={
               <span className="code-data">
                 {coords.lat.toFixed(4)}

@@ -28,7 +28,16 @@ export const FIELD_MAPS: Record<string, EntityFieldMap> = {
     timestamp: (p) => (typeof p.time === "number" ? p.time : undefined),
   },
   "submarine-cables": { label: ["name", "label"], tier: confirmed },
-  "data-centers": { label: ["name", "company", "label"] },
+  "data-centers": {
+    label: ["name", "company", "label"],
+    tier: (p) => {
+      const q = p.geocode_quality as string | undefined;
+      if (q === "source_exact" || q === "geocoded_exact") return "confirmed";
+      if (q === "geocoded_street" || q === "geocoded_neighbourhood") return "estimated";
+      if (q === "geocoded_city" || q === "source_city_center") return "baseline";
+      return "estimated";
+    },
+  },
   dams: { label: ["DAM_NAME", "RES_NAME", "label"], tier: confirmed },
   "critical-minerals": { label: ["DEPOSIT_NAME", "label"] },
   "mineral-deposits": { label: ["DEP_NAME", "label"] },
