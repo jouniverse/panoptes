@@ -47,7 +47,8 @@ export type MarkerShape =
   | "hexagon" // space / satellite
   | "chevron" // aviation (heading-aware)
   | "ring" // area / event radius
-  | "cross"; // alerts / hazards
+  | "cross" // alerts / hazards
+  | "target"; // selection overlay (corner brackets)
 
 export type LayerKind = "point" | "line" | "polygon" | "heatmap" | "choropleth";
 

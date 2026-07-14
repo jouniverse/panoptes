@@ -742,7 +742,8 @@ export const LAYERS: LayerDefinition[] = [
     color: M.deepRed,
     renderer: "both",
     defaultEnabled: false,
-    description: "Historical & current water-related conflicts (Pacific Institute).",
+    description:
+      "Historical & current water-related conflicts (Pacific Institute). Overlapping locations are jittered for visibility.",
     source: {
       kind: "static",
       ref: "water-conflicts.geojson",

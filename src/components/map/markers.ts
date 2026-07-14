@@ -11,6 +11,7 @@ const SHAPES: MarkerShape[] = [
   "chevron",
   "ring",
   "cross",
+  "target",
 ];
 
 export interface IconMappingEntry {
@@ -143,7 +144,32 @@ function drawShape(
       ctx.lineTo(cx, cy + r);
       ctx.stroke();
       break;
+    case "target": {
+      ctx.lineWidth = 5;
+      const s = r * 0.92;
+      const leg = r * 0.48;
+      drawCornerBracket(ctx, cx - s, cy - s, 1, 1, leg);
+      drawCornerBracket(ctx, cx + s, cy - s, -1, 1, leg);
+      drawCornerBracket(ctx, cx + s, cy + s, -1, -1, leg);
+      drawCornerBracket(ctx, cx - s, cy + s, 1, -1, leg);
+      break;
+    }
   }
+}
+
+function drawCornerBracket(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  dx: number,
+  dy: number,
+  leg: number,
+) {
+  ctx.beginPath();
+  ctx.moveTo(x, y + dy * leg);
+  ctx.lineTo(x, y);
+  ctx.lineTo(x + dx * leg, y);
+  ctx.stroke();
 }
 
 function poly(ctx: CanvasRenderingContext2D, pts: [number, number][]) {

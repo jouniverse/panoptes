@@ -2,6 +2,10 @@
 /.vscode
 /.cursor
 
+# py venv
+/venv
+/.venv
+
 # dependencies
 /node_modules
 /.pnp
@@ -36,6 +40,9 @@ src/.env
 /notes
 /freezer
 
+# extra imgs
+/imgs/extra-imgs
+
 # Tier B vector tiles are large -> hosted on object storage, not committed.
 /public/tiles
 
@@ -45,3 +52,4 @@ src/.env
 
 # typescript
 *.tsbuildinfo
+

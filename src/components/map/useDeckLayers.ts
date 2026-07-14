@@ -125,6 +125,25 @@ export function useDeckLayers({
         );
       }
     }
+
+    if (selectedId && atlas) {
+      const selectedEntity = findSelectedEntity(
+        data,
+        enabled,
+        layerIdSet,
+        intelFilter,
+        selectedId,
+        zoom,
+        tlEnabled,
+        tlLo,
+        tlHi,
+        eqWindowDays,
+      );
+      if (selectedEntity) {
+        layers.push(...buildSelectionLayers(selectedEntity, atlas, isGlobe, viewCenter));
+      }
+    }
+
     return layers;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -306,16 +325,14 @@ function markerLayer(
     getIcon: () => def.marker,
     getPosition: (d) => entityPosition(d, isGlobe),
     getSize: (d) =>
-      (d.id === selectedId ? 26 : 18) *
+      (d.id === selectedId ? 22 : 18) *
       (1 + (d.severity ?? 0) * 0.6) *
       (def.sizeScale ?? 1),
     sizeUnits: "pixels",
     getColor: (d) => {
       const base = colorFn ? colorFn(d) : ([color[0], color[1], color[2], 235] as RGBA);
       if (d.id === selectedId) {
-        // For tone/age-colored layers keep the entity color (size is the selection
-        // cue). For flat-color layers flash gold so selection is unmissable.
-        return colorFn ? ([base[0], base[1], base[2], 255] as RGBA) : RGB.gold;
+        return [base[0], base[1], base[2], 255] as RGBA;
       }
       return base;
     },
@@ -340,4 +357,82 @@ function markerLayer(
       data: [viewCenter.longitude, viewCenter.latitude, isGlobe],
     },
   });
+}
+
+function findSelectedEntity(
+  data: Record<string, LayerData>,
+  enabled: Record<string, boolean>,
+  layerIdSet: Set<string> | null,
+  intelFilter: IntelFilter,
+  selectedId: string,
+  zoom: number,
+  tlEnabled: boolean,
+  tlLo: number,
+  tlHi: number,
+  eqWindowDays: number,
+): GeoEntity | undefined {
+  for (const def of LAYERS) {
+    if (layerIdSet && !layerIdSet.has(def.id)) continue;
+    if (!enabled[def.id]) continue;
+    if (intelFilter !== "all" && !layerInIntelMode(def, intelFilter)) continue;
+    if (def.minZoom != null && zoom < def.minZoom) continue;
+    if (def.kind !== "point" && def.kind !== "heatmap") continue;
+
+    const ld = data[def.id];
+    if (!ld) continue;
+
+    let entities = ld.entities;
+    if (def.id === "earthquakes" && eqWindowDays < 7) {
+      const cutoff = Date.now() - eqWindowDays * 24 * 60 * 60_000;
+      entities = entities.filter((e) => e.timestamp == null || e.timestamp >= cutoff);
+    }
+    if (tlEnabled) {
+      const hasTime = entities.some((e) => e.timestamp != null);
+      if (hasTime) {
+        entities = entities.filter(
+          (e) => e.timestamp == null || (e.timestamp >= tlLo && e.timestamp <= tlHi),
+        );
+      }
+    }
+
+    const hit = entities.find((e) => e.id === selectedId);
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
+/** Intel corner brackets framing the selected point marker. */
+function buildSelectionLayers(
+  entity: GeoEntity,
+  atlas: { atlas: HTMLCanvasElement; mapping: Record<string, unknown> },
+  isGlobe: boolean,
+  viewCenter: { longitude: number; latitude: number },
+): Layer[] {
+  if (
+    isGlobe &&
+    !isGlobePointVisible(entity.lon, entity.lat, viewCenter.longitude, viewCenter.latitude)
+  ) {
+    return [];
+  }
+
+  const intel = RGB.intel;
+
+  return [
+    new IconLayer<GeoEntity>({
+      id: "selection-target",
+      data: [entity],
+      pickable: false,
+      iconAtlas: atlas.atlas as unknown as string,
+      iconMapping: atlas.mapping as never,
+      getIcon: () => "target",
+      getPosition: () => entityPosition(entity, isGlobe),
+      getSize: 46,
+      sizeUnits: "pixels",
+      getColor: [intel[0], intel[1], intel[2], 255],
+      ...globeIconLayerProps(isGlobe),
+      updateTriggers: {
+        getPosition: [isGlobe],
+      },
+    }),
+  ];
 }

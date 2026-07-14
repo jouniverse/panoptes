@@ -1127,23 +1127,51 @@ const tasks = {
     const idx = (name) => header.indexOf(name);
     const iLat = idx("Latitude"),
       iLon = idx("Longitude");
-    const features = [];
+    const raw = [];
     for (let r = 1; r < rows.length; r++) {
       const row = rows[r];
       const lat = parseFloat(row[iLat]);
       const lon = parseFloat(row[iLon]);
       if (Number.isNaN(lat) || Number.isNaN(lon)) continue;
-      features.push(
-        pt(lon, lat, {
+      raw.push({
+        srcLon: lon,
+        srcLat: lat,
+        properties: {
           Title: row[idx("Title")],
           Date: row[idx("Date")],
           Country: row[idx("Country")],
           "Conflict Type": row[idx("Conflict Type")],
           Description: (row[idx("Description")] || "").slice(0, 400),
           Sources: row[idx("Sources")],
-        }),
-      );
+        },
+      });
     }
+
+    const groups = new Map();
+    raw.forEach((r, i) => {
+      const key = `${Number(r.srcLon).toFixed(5)},${Number(r.srcLat).toFixed(5)}`;
+      const g = groups.get(key);
+      if (g) g.push(i);
+      else groups.set(key, [i]);
+    });
+
+    const features = raw.map((r, i) => {
+      const key = `${Number(r.srcLon).toFixed(5)},${Number(r.srcLat).toFixed(5)}`;
+      const group = groups.get(key);
+      const clusterIndex = group.indexOf(i);
+      const clusterSize = group.length;
+      const jittered = clusterSize > 1;
+      const [lon, lat] = jittered
+        ? clusterJitter(r.srcLon, r.srcLat, clusterIndex, clusterSize)
+        : [r.srcLon, r.srcLat];
+      return pt(lon, lat, {
+        ...r.properties,
+        source_longitude: r.srcLon,
+        source_latitude: r.srcLat,
+        cluster_size: clusterSize,
+        jittered,
+      });
+    });
     write("water-conflicts.geojson", features);
   },
 
