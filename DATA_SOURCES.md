@@ -12,7 +12,7 @@ See also **[`README.md`](README.md)** for setup, data pipeline, and deployment.
 | **Build input**  | File under `static-data/` used by `npm run geo:build` (if applicable)                  |
 | **Upstream**     | Original provider URL or API docs — verify links manually where marked _(placeholder)_ |
 
-Placeholders (`—`) mean the upstream URL was not confirmed in code; fill in after checking `static-data/` provenance or `notes/panoptes-data-sources.txt`.
+Placeholders (`—`) mean the upstream URL was not confirmed in code; fill in after checking `static-data/` provenance.
 
 **Related scripts:** `npm run geo:build` · `npm run analytics:cache` · `npm run tles:fetch` · `npm run ais:relay`
 
