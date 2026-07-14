@@ -177,6 +177,8 @@ This project is not affiliated with or endorsed by any of the data providers.
 
 Each layer lists source and license in the app (detail panel **SRC:** line and layer registry). Nuclear and missile models use public scaling laws (Glasstone & Dolan; great-circle ballistics). Verify upstream terms before redistributing raw data.
 
+[Argus Panoptes](https://en.wikipedia.org/wiki/Argus_Panoptes), a figure from Greek mythology, is a many-eyed giant, known for his perpetual vigilance.
+
 ## Future improvements
 
 - **Global weather layer** (Geospatial): current conditions, forecasts, and extreme-weather highlights as a toggleable layer — complementary to existing METAR/SIGMET on military airports
