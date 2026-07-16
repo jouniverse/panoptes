@@ -13,6 +13,7 @@ There is **no classified data**. Every layer carries source attribution in the U
 ![Screenshot Geospatial View 5](./imgs/geospatial-5.png)
 ![Screenshot Analytics View 1](./imgs/analytics-1.png)
 ![Screenshot OPS View 1](./imgs/ops-1.png)
+![Screenshot OPS View 2](./imgs/ops-2.png)
 ![Screenshot Tools View 1](./imgs/tools-1.png)
 
 ## Features
