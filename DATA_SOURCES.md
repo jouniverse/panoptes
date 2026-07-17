@@ -195,7 +195,7 @@ _NOTE: Exact location of data centers is not always available. Street level and 
 
 |                  |                                                                                                              |
 | ---------------- | ------------------------------------------------------------------------------------------------------------ |
-| **Description**  | Large dams (GRanD / Global Dam Watch).                                                                       |
+| **Description**  | Large dams (GRanD / GWSP).                                                                                   |
 | **Runtime file** | `public/geo/dams.geojson`                                                                                    |
 | **Build input**  | `static-data/dams-and-reservoirs/dams.geojson`                                                               |
 | **Upstream**     | [GRanD/GWSP](https://ln.sync.com/dl/bd47eb6b0/anhxaikr-62pmrgtq-k44xf84f-pyz4atkm/view/default/447819520013) |
